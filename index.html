@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ドット将棋</title>
+<script>
+// タブのアイコン：「ド」の駒のドット絵（32x32）をその場で描く
+(function(){
+  var N=32,cv=document.createElement('canvas');cv.width=cv.height=N;var g=cv.getContext('2d');
+  function px(x,y,c){g.fillStyle=c;g.fillRect(x,y,1,1);}
+  for(var y=0;y<N;y++)for(var x=0;x<N;x++){var c='#F8B800';if(x%8===3||y%8===3)c='#AC7C00';if(x<=1||y<=1||x>=N-2||y>=N-2)c='#881400';px(x,y,c);}
+  var X=7,Y=4,W=18,H=24;
+  function inside(cx,cy){if(cx<0||cy<0||cx>=W||cy>=H)return false;if(cy<=2)return cx>=7&&cx<=10;if(cy<=5)return cx>=5&&cx<=12;if(cy<=13)return cx>=2&&cx<=15;return true;}
+  for(var cy=0;cy<H;cy++)for(var cx=0;cx<W;cx++)if(inside(cx,cy))px(X+cx+1,Y+cy+1,'#881400');
+  for(cy=0;cy<H;cy++)for(cx=0;cx<W;cx++){if(!inside(cx,cy))continue;
+    var edge=!(inside(cx-1,cy)&&inside(cx+1,cy)&&inside(cx,cy-1)&&inside(cx,cy+1));px(X+cx,Y+cy,edge?'#000000':'#FCE0A8');}
+  var G=['..##...#..#.','..##....#..#','..##........','..####......','..##.###....','..##...###..','..##.....##.','..##........','..##........','..##........','..##........','..##........'];
+  for(var r=0;r<G.length;r++)for(var c2=0;c2<12;c2++)if(G[r][c2]==='#')px(X+3+c2,Y+9+r,'#000000');
+  var url=cv.toDataURL('image/png');
+  ['icon','apple-touch-icon'].forEach(function(rel){var l=document.createElement('link');l.rel=rel;l.href=url;document.head.appendChild(l);});
+})();
+</script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* layout: 盤（駒台つき）と操作パネルを横並び、狭い画面では縦積み。ファミコン調の単一テーマ */
+:root{
+  --k:#000000; --w:#FCFCFC; --cream:#FCE0A8; --gface:#F8D878; --yellow:#F8B800; --orange:#FCA044;
+  --ochre:#AC7C00; --rust:#881400; --brown:#503000; --green:#00A800; --red:#D82800;
+  --font:'DotGothic16','MS Gothic','Osaka-Mono',monospace;
+  --cs:clamp(28px,calc((100vw - 96px)/9),40px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--k);color:var(--cream);font-family:var(--font);margin:0;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+header{display:flex;flex-direction:column;align-items:center;gap:4px;margin-bottom:18px;text-align:center}
+h1{font-size:28px;font-weight:400;margin:0;color:var(--yellow);letter-spacing:.12em}
+.sub{font-size:13px;color:var(--cream)}
+.wrap{display:flex;gap:24px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.table{background:var(--brown);padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;margin:4px;
+  box-shadow:0 -4px 0 0 var(--cream),0 4px 0 0 var(--cream),-4px 0 0 0 var(--cream),4px 0 0 0 var(--cream)}
+.komadai{background:var(--ochre);width:calc(var(--cs)*9 + 8px);min-height:calc(var(--cs)*1.05 + 12px);display:flex;align-items:center;gap:4px;padding:2px 8px;border:4px solid var(--rust);flex-wrap:wrap}
+.lbl{font-size:13px;color:var(--k);margin-right:4px;min-width:30px}
+.hp{display:flex;align-items:center;gap:1px;cursor:default;padding:2px}
+.hp.mine{cursor:pointer}
+.hp.sel{background:var(--w)}
+.hp.hint{animation:hintbg .8s steps(1) infinite}
+.cnt{font-size:12px;color:var(--k)}
+.coords{display:flex;width:calc(var(--cs)*9);justify-content:space-around;font-size:13px;color:var(--cream)}
+.board{background:var(--yellow);border:4px solid var(--rust);position:relative;display:grid;
+  grid-template-columns:repeat(9,var(--cs));grid-template-rows:repeat(9,calc(var(--cs)*1.06))}
+.cell{border-right:2px solid var(--brown);border-bottom:2px solid var(--brown);display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;padding:0;background:none;border-top:0;border-left:0;font:inherit}
+.cell:nth-child(9n){border-right:0}
+.cell:nth-child(n+73){border-bottom:0}
+.cell:focus-visible{outline:3px solid var(--w);outline-offset:-3px}
+.cell.last{background:var(--orange)}
+.cell.sel{background:var(--w)}
+.cell.chk{background:var(--red)}
+.cell.move::after{content:'';width:8px;height:8px;background:var(--green);position:absolute;box-shadow:0 0 0 2px var(--k)}
+.cell.cap{outline:4px solid var(--red);outline-offset:-6px}
+.cell.hint{animation:hintbg .8s steps(1) infinite}
+@keyframes hintbg{0%{background:var(--green)}50%{background:var(--w)}}
+.pc{--pw:calc(var(--cs)*.84);width:var(--pw);height:calc(var(--cs)*.95);background:var(--k);position:relative;flex:none;
+  clip-path:polygon(37.5% 0,62.5% 0,62.5% 11%,75% 11%,75% 22%,87.5% 22%,87.5% 56%,100% 56%,100% 100%,0 100%,0 56%,12.5% 56%,12.5% 22%,25% 22%,25% 11%,37.5% 11%)}
+.pc span{position:absolute;inset:3px;background:var(--cream);display:flex;align-items:flex-end;justify-content:center;font-size:calc(var(--cs)*.46);line-height:1;color:var(--k);padding-bottom:3px;
+  clip-path:polygon(37.5% 0,62.5% 0,62.5% 11%,75% 11%,75% 22%,87.5% 22%,87.5% 56%,100% 56%,100% 100%,0 100%,0 56%,12.5% 56%,12.5% 22%,25% 22%,25% 11%,37.5% 11%)}
+.pc.g{transform:rotate(180deg)}
+.pc.g span{background:var(--gface)}
+.pc.pro span{color:var(--red)}
+.pc.sm{width:calc(var(--cs)*.68);height:calc(var(--cs)*.78)}
+.pc.sm span{font-size:calc(var(--cs)*.38);padding-bottom:2px}
+.hoshi{position:absolute;width:6px;height:6px;background:var(--brown);transform:translate(-50%,-50%);pointer-events:none}
+.panel{width:240px;display:flex;flex-direction:column;gap:14px;padding:4px}
+@media (max-width:720px){.panel{width:calc(var(--cs)*9 + 44px)}}
+.card{background:var(--cream);border:4px solid var(--k);outline:4px solid var(--cream);padding:10px 12px;color:var(--k)}
+.card h2{margin:0 0 6px;font-size:16px;font-weight:400;color:var(--k)}
+.msg{font-size:14px;line-height:1.7;min-height:3.4em}
+.msg b{font-weight:400;color:var(--red)}
+.btn{font-family:inherit;background:var(--yellow);border:4px solid var(--k);outline:4px solid var(--cream);border-radius:0;color:var(--k);padding:8px 10px;font-size:15px;cursor:pointer;width:100%;text-align:left;box-shadow:6px 6px 0 0 var(--cream)}
+.btn:hover{background:var(--orange)}
+.btn:active{transform:translate(4px,4px);box-shadow:2px 2px 0 0 var(--cream)}
+.btn:focus-visible{outline-color:var(--w)}
+.btn.warn{background:var(--red);color:var(--w)}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;font-family:inherit;text-align:center;font-size:13px;padding:5px 0;border:3px solid var(--k);background:var(--yellow);color:var(--k);cursor:pointer;border-radius:0}
+.seg button[aria-pressed="true"]{background:var(--k);color:var(--yellow)}
+.guide{display:flex;gap:10px;align-items:center}
+.gdesc{font-size:13px;line-height:1.6;flex:1;min-width:0}
+.mini{display:grid;grid-template-columns:repeat(5,16px);grid-template-rows:repeat(5,16px);gap:2px;background:var(--brown);border:2px solid var(--brown);flex:none}
+.mini div{background:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--w);line-height:1}
+.mini .ok{background:var(--green)}
+.mini .me{background:var(--cream);color:var(--k)}
+.blink{animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+.dialog{background:var(--cream);border:4px solid var(--k);outline:4px solid var(--cream);padding:18px 20px;color:var(--k);width:min(320px,100%);display:flex;flex-direction:column;gap:12px;text-align:center}
+.dialog h2{margin:0;font-size:20px;font-weight:400}
+.dialog .row{display:flex;gap:12px}
+.dialog .btn{text-align:center;box-shadow:4px 4px 0 0 var(--k);outline:none}
+.title{position:fixed;inset:0;background:var(--k);z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;
+  padding:calc(env(safe-area-inset-top,0px) + 24px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px))}
+.tpieces{display:flex;gap:18px;align-items:flex-end}
+.tname{font-size:clamp(44px,13vw,76px);font-weight:400;margin:0;color:var(--yellow);letter-spacing:.1em;text-shadow:5px 5px 0 var(--rust);line-height:1.1}
+.tsub{font-size:15px;color:var(--orange);letter-spacing:.4em;margin-top:-8px}
+.tmenu{display:flex;flex-direction:column;gap:18px;width:min(240px,100%);margin-top:10px}
+.tmenu .btn{text-align:center;font-size:17px}
+.tmenu,.tfoot{transition:opacity .3s steps(3)}
+.title.intro .tmenu,.title.intro .tfoot{opacity:0;pointer-events:none}
+.title.intro .tpieces{animation:drop .6s steps(6) both}
+@keyframes drop{from{transform:translateY(-60px)}to{transform:none}}
+.tfoot{font-size:13px;color:var(--cream)}
+.foot{margin-top:22px;text-align:center;font-size:12px;color:var(--ochre)}
+@media (prefers-reduced-motion:reduce){.blink,.cell.hint,.hp.hint{animation:none}.cell.hint,.hp.hint{background:var(--green)}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ドット将棋</h1>
+  <div class="sub">CPUと たいきょく ・ じかん せいげん なし</div>
+</header>
+
+<div class="wrap">
+  <div class="table">
+    <div class="komadai" id="hand1"></div>
+    <div class="coords" aria-hidden="true"><span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span></div>
+    <div class="board" id="board" role="grid" aria-label="しょうぎばん"></div>
+    <div class="komadai" id="hand0"></div>
+  </div>
+  <div class="panel">
+    <div class="card"><h2 id="turn"></h2><div class="msg" id="msg" aria-live="polite"></div></div>
+    <div class="card"><h2 id="gtitle">こまの うごき</h2><div class="guide"><div class="mini" id="mini" aria-hidden="true"></div><div class="gdesc" id="gdesc"></div></div></div>
+    <button class="btn" id="hintBtn" type="button">★ ヒントを みる</button>
+    <button class="btn" id="undoBtn" type="button">◀ まった（1て もどす）</button>
+    <div class="card"><h2>つよさ</h2><div class="seg" id="seg">
+      <button type="button" id="lv0" data-lv="0">やさしい</button><button type="button" id="lv1" data-lv="1">ふつう</button><button type="button" id="lv2" data-lv="2">つよい</button>
+    </div></div>
+    <button class="btn" id="newBtn" type="button">↺ はじめから</button>
+  </div>
+</div>
+<div class="foot">あなたが さきて（したがわ）。こまを タップして えらび、うごかしたい マスを タップ。</div>
+
+<div class="title" id="title" hidden>
+  <div class="tpieces" aria-hidden="true"><div class="pc" style="--cs:128px"><span style="align-items:center;padding:22% 0 0">ド</span></div></div>
+  <h2 class="tname">ドット将棋</h2>
+  <div class="tsub">DOT SHOGI</div>
+  <div class="tmenu" id="tmenu">
+    <button class="btn" id="tContinue" type="button" hidden>▶ つづきから</button>
+    <button class="btn" id="tNew" type="button">▶ さいしょから</button>
+  </div>
+  <div class="tfoot" id="tfoot">CPUと たいきょく ・ じかん せいげん なし<br><span class="blink">ボタンを おしてね</span></div>
+</div>
+
+<div class="overlay" id="promo" hidden><div class="dialog"><h2>なりますか？</h2><div id="promoTxt"></div>
+  <div class="row"><button class="btn" id="promoYes" type="button">なる</button><button class="btn" id="promoNo" type="button">ならない</button></div></div></div>
+<div class="overlay" id="over" hidden><div class="dialog"><h2 id="overTitle"></h2><div id="overTxt"></div>
+  <div class="row"><button class="btn" id="overUndo" type="button">まった</button><button class="btn" id="overNew" type="button">もういちど</button></div></div></div>
+
+<script id="engine" type="text/plain">
+var VAL=[0,100,300,350,500,550,800,1000,0,520,500,500,550,0,1100,1300];
+var HANDV=[0,115,330,380,550,600,900,1100,0];
+var GOLD=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,0]];
+var K8=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+var DIAG=[[-1,-1],[-1,1],[1,-1],[1,1]],ORTH=[[-1,0],[1,0],[0,-1],[0,1]];
+var STEPS=[[],[[-1,0]],[],[[-2,-1],[-2,1]],[[-1,-1],[-1,0],[-1,1],[1,-1],[1,1]],GOLD,[],[],K8,GOLD,GOLD,GOLD,GOLD,[],ORTH,DIAG];
+var SLIDES=[[],[],[[-1,0]],[],[],[],DIAG,ORTH,[],[],[],[],[],[],DIAG,ORTH];
+var WIN=100000;
+function newPos(){var b=new Int8Array(81),back=[2,3,4,5,8,5,4,3,2];
+  for(var c=0;c<9;c++){b[c]=-back[c];b[72+c]=back[c];b[18+c]=-1;b[54+c]=1;}
+  b[10]=-7;b[16]=-6;b[64]=6;b[70]=7;
+  return {b:b,h:[[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0]],side:0};}
+function inZ(r,side){return side?r>=6:r<=2;}
+function addM(out,t,i,j,w,r,nr,side,prune){
+  if(t<=7&&t!==5&&(inZ(r,side)||inZ(nr,side))){
+    var rr=side?8-nr:nr,must=((t===1||t===2)&&rr===0)||(t===3&&rr<=1);
+    out.push({f:i,t:j,d:0,p:true,c:w});
+    if(!must&&!(prune&&(t===1||t===6||t===7)))out.push({f:i,t:j,d:0,p:false,c:w});
+  }else out.push({f:i,t:j,d:0,p:false,c:w});}
+function gen(p,side,prune,capsOnly){
+  var b=p.b,s=side?-1:1,out=[],i,k;
+  for(i=0;i<81;i++){var v=b[i];if(!v||(v>0)!==(s>0))continue;
+    var t=v*s,r=(i/9)|0,c=i%9,st=STEPS[t],sl=SLIDES[t];
+    for(k=0;k<st.length;k++){var nr=r+st[k][0]*s,nc=c+st[k][1]*s;if(nr<0||nr>8||nc<0||nc>8)continue;
+      var j=nr*9+nc,w=b[j];if(w&&(w>0)===(s>0))continue;if(capsOnly&&!w)continue;addM(out,t,i,j,w,r,nr,side,prune);}
+    for(k=0;k<sl.length;k++){var dr=sl[k][0]*s,dc=sl[k][1]*s,nr2=r+dr,nc2=c+dc;
+      while(nr2>=0&&nr2<9&&nc2>=0&&nc2<9){var j2=nr2*9+nc2,w2=b[j2];if(w2&&(w2>0)===(s>0))break;
+        if(!capsOnly||w2)addM(out,t,i,j2,w2,r,nr2,side,prune);if(w2)break;nr2+=dr;nc2+=dc;}}}
+  if(capsOnly)return out;
+  var h=p.h[side];
+  for(var d=1;d<=7;d++){if(!h[d])continue;
+    for(i=0;i<81;i++){if(b[i])continue;var row=(i/9)|0,rr=side?8-row:row;
+      if((d===1||d===2)&&rr===0)continue;if(d===3&&rr<=1)continue;
+      if(d===1){var ok=true;for(k=i%9;k<81;k+=9)if(b[k]===s){ok=false;break;}if(!ok)continue;}
+      out.push({f:-1,t:i,d:d,p:false,c:0});}}
+  return out;}
+function make(p,m){var s=p.side?-1:1,b=p.b;
+  if(m.f<0){b[m.t]=s*m.d;p.h[p.side][m.d]--;}
+  else{var v=b[m.f],w=b[m.t];m.c=w;if(w){var a=w<0?-w:w;if(a>8)a-=8;p.h[p.side][a]++;}b[m.t]=m.p?v+8*s:v;b[m.f]=0;}
+  p.side^=1;}
+function unmake(p,m){p.side^=1;var s=p.side?-1:1,b=p.b;
+  if(m.f<0){b[m.t]=0;p.h[p.side][m.d]++;}
+  else{var v=b[m.t];b[m.f]=m.p?v-8*s:v;b[m.t]=m.c;if(m.c){var a=m.c<0?-m.c:m.c;if(a>8)a-=8;p.h[p.side][a]--;}}}
+function attacked(p,sq,by){var b=p.b,s=by?-1:1,tr=(sq/9)|0,tc=sq%9;
+  for(var i=0;i<81;i++){var v=b[i];if(!v||(v>0)!==(s>0))continue;var t=v*s,r=(i/9)|0,c=i%9,st=STEPS[t],sl=SLIDES[t],k;
+    for(k=0;k<st.length;k++)if(r+st[k][0]*s===tr&&c+st[k][1]*s===tc)return true;
+    for(k=0;k<sl.length;k++){var dr=sl[k][0]*s,dc=sl[k][1]*s,nr=r+dr,nc=c+dc;
+      while(nr>=0&&nr<9&&nc>=0&&nc<9){if(nr===tr&&nc===tc)return true;if(b[nr*9+nc])break;nr+=dr;nc+=dc;}}}
+  return false;}
+function kingSq(p,side){return p.b.indexOf(side?-8:8);}
+function inCheck(p,side){var k=kingSq(p,side);return k>=0&&attacked(p,k,side^1);}
+function legal(p,noUchi){var side=p.side,ms=gen(p,side,false,false),out=[];
+  for(var i=0;i<ms.length;i++){var m=ms[i];make(p,m);var ok=!inCheck(p,side);
+    if(ok&&!noUchi&&m.f<0&&m.d===1&&inCheck(p,side^1)&&legal(p,true).length===0)ok=false;
+    unmake(p,m);if(ok)out.push(m);}
+  return out;}
+function kingSafety(p,side){var k=kingSq(p,side);if(k<0)return 0;var s=side?-1:1,r=(k/9)|0,c=k%9,n=0;
+  for(var dr=-1;dr<=1;dr++)for(var dc=-1;dc<=1;dc++){var nr=r+dr,nc=c+dc;if(nr<0||nr>8||nc<0||nc>8)continue;
+    var v=p.b[nr*9+nc]*s;if(v===4||v===5||(v>=9&&v<=12))n++;}
+  return n*25;}
+function evaluate(p){var sc=0,b=p.b;
+  for(var i=0;i<81;i++){var v=b[i];if(!v)continue;var a=v>0?v:-v,x=VAL[a],r=(i/9)|0,adv=v>0?8-r:r;
+    if(a===1||a===3||a===4)x+=adv*4;sc+=v>0?x:-x;}
+  for(var t=1;t<=7;t++)sc+=(p.h[0][t]-p.h[1][t])*HANDV[t];
+  sc+=kingSafety(p,0)-kingSafety(p,1);
+  return p.side?-sc:sc;}
+function ord(p,m){if(m.f<0)return 0;var w=p.b[m.t],s=0;
+  if(w){var a=w<0?-w:w,f=p.b[m.f];s=10000+VAL[a]*10-VAL[f<0?-f:f];}if(m.p)s+=500;return s;}
+var nodes=0,deadline=0,aborted=false;
+function sortMoves(p,ms){for(var i=0;i<ms.length;i++)ms[i].o=ord(p,ms[i]);ms.sort(function(a,b){return b.o-a.o;});}
+function qs(p,alpha,beta,qd){
+  var ms=gen(p,p.side,true,true);
+  for(var i=0;i<ms.length;i++){var w=ms[i].c;if(w===8||w===-8)return WIN;}
+  var stand=evaluate(p);if(stand>=beta||qd>=4)return stand;if(stand>alpha)alpha=stand;
+  sortMoves(p,ms);
+  for(i=0;i<ms.length;i++){var m=ms[i];make(p,m);var v=-qs(p,-beta,-alpha,qd+1);unmake(p,m);
+    if(v>alpha){alpha=v;if(alpha>=beta)break;}}
+  return alpha;}
+function search(p,depth,alpha,beta,ply){
+  if((++nodes&1023)===0&&Date.now()>deadline)aborted=true;
+  if(aborted)return 0;
+  if(depth<=0)return qs(p,alpha,beta,0);
+  var ms=gen(p,p.side,true,false),i;
+  for(i=0;i<ms.length;i++){var w=ms[i].c;if(w===8||w===-8)return WIN-ply;}
+  sortMoves(p,ms);var best=-WIN*2;
+  for(i=0;i<ms.length;i++){var m=ms[i];make(p,m);var v=-search(p,depth-1,-beta,-alpha,ply+1);unmake(p,m);
+    if(aborted)return 0;if(v>best)best=v;if(v>alpha)alpha=v;if(alpha>=beta)break;}
+  return best;}
+var LEVELS=[{d:1,t:800,noise:220},{d:2,t:2500,noise:25},{d:5,t:6000,noise:0},{d:3,t:2500,noise:0}];
+function think(p,level){
+  var root=legal(p,false);if(!root.length)return null;
+  var cfg=LEVELS[level];nodes=0;aborted=false;deadline=Date.now()+cfg.t;
+  sortMoves(p,root);var list=root.map(function(m){return {m:m,v:0};}),best=list[0].m;
+  for(var d=1;d<=cfg.d;d++){var alpha=-WIN*2,done=true;
+    for(var i=0;i<list.length;i++){var s=list[i];make(p,s.m);
+      var v=cfg.noise?-search(p,d-1,-WIN*2,WIN*2,1):-search(p,d-1,-WIN*2,-alpha,1);unmake(p,s.m);
+      if(aborted){done=false;break;}
+      s.v=v+(cfg.noise?Math.floor(Math.random()*cfg.noise):0);if(v>alpha)alpha=v;}
+    if(!done)break;
+    list.sort(function(a,b){return b.v-a.v;});best=list[0].m;
+    if(list[0].v>=WIN-50)break;}
+  return best;}
+</script>
+
+<script>
+(0,eval)(document.getElementById('engine').textContent);
+
+const KJ=['','歩','香','桂','銀','金','角','飛','王','と','杏','圭','全','','馬','龍'];
+const NM=['','ふ','きょうしゃ','けいま','ぎん','きん','かく','ひしゃ','おう','と','なりきょう','なりけい','なりぎん','','うま','りゅう'];
+const DESC=['','まえに 1マス すすめる','まえに どこまでも すすめる','まえに 2マス・よこに 1マスの ばしょへ とびこえる','ななめ と まえに 1マス','うしろの ななめ いがいの 6ほうこうに 1マス','ななめに どこまでも すすめる','たて と よこに どこまでも すすめる','まわりの 8マス どこでも 1マス','きん と おなじ うごき','きん と おなじ うごき','きん と おなじ うごき','きん と おなじ うごき','','かくの うごき ＋ たてよこ 1マス','ひしゃの うごき ＋ ななめ 1マス'];
+const DAN='一二三四五六七八九';
+const LVNAME=['やさしい','ふつう','つよい'];
+const SAVE_KEY='dot-shogi-v1';
+const CPU_DELAY=500;
+const $=id=>document.getElementById(id);
+
+let S=null;           // game state
+let token=0;          // invalidates stale CPU / hint results
+let ui={sel:null,targets:[],view:null,hint:null,pending:null,confirmNew:false,thinking:false,hinting:false};
+let legalCache=null;
+
+function freshState(level){return {p:newPos(),last:null,history:[],level:level==null?1:level,over:null,msg:null};}
+function snap(){return {b:Array.from(S.p.b),h:[S.p.h[0].slice(),S.p.h[1].slice()],side:S.p.side,last:S.last,over:S.over};}
+function restore(x){S.p={b:Int8Array.from(x.b),h:[x.h[0].slice(),x.h[1].slice()],side:x.side};S.last=x.last;S.over=x.over||null;}
+function serialize(){return {cur:snap(),history:S.history,level:S.level,msg:S.msg};}
+function deserialize(d){S=freshState(d.level);restore(d.cur);S.history=d.history||[];S.msg=d.msg||null;}
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(serialize()));}catch(e){}}
+function load(){try{const t=localStorage.getItem(SAVE_KEY);if(t){deserialize(JSON.parse(t));return true;}}catch(e){}return false;}
+
+function sq(i){return (9-i%9)+DAN[(i/9)|0];}
+function moveText(m,side){const mark=side?'☖':'☗';
+  if(m.f<0)return mark+sq(m.t)+KJ[m.d]+'打';
+  const v=Math.abs(S.p.b[m.t]);const base=m.p?v-8:v;
+  return mark+sq(m.t)+(base===8&&side?'玉':KJ[base])+(m.p?'成':'');}
+function pieceName(a){return NM[a];}
+
+function playerLegal(){if(!legalCache)legalCache=legal(S.p,false);return legalCache;}
+
+/* ---- worker ---- */
+let worker=null,workerCb={};
+try{
+  const src=document.getElementById('engine').textContent+
+    '\nonmessage=function(e){var d=e.data,p={b:Int8Array.from(d.b),h:[d.h[0].slice(),d.h[1].slice()],side:d.side};postMessage({id:d.id,m:think(p,d.level)});};';
+  worker=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
+  worker.onmessage=e=>{const cb=workerCb[e.data.id];delete workerCb[e.data.id];if(cb)cb(e.data.m);};
+  worker.onerror=()=>{worker=null;const cbs=workerCb;workerCb={};Object.values(cbs).forEach(f=>f(undefined));};
+}catch(e){worker=null;}
+let jobId=0;
+function runThink(level,cb){
+  const job={id:++jobId,b:Array.from(S.p.b),h:[S.p.h[0].slice(),S.p.h[1].slice()],side:S.p.side,level};
+  const sync=()=>setTimeout(()=>{const p={b:Int8Array.from(job.b),h:job.h,side:job.side};cb(think(p,level));},40);
+  if(worker){workerCb[job.id]=m=>{if(m===undefined)sync();else cb(m);};worker.postMessage(job);}
+  else sync();}
+
+/* ---- game flow ---- */
+function setMsg(t){S.msg=t;}
+function endIfOver(){
+  const moves=legal(S.p,false);
+  if(!moves.length){S.over=S.p.side===1?'win':'lose';return true;}
+  return false;}
+
+function playerMove(m){
+  S.history.push(snap());if(S.history.length>300)S.history.shift();
+  const txt=moveText(m,0);
+  make(S.p,m);S.last={f:m.f,t:m.t};legalCache=null;
+  ui.sel=null;ui.targets=[];ui.hint=null;ui.view=null;
+  // moveText needs piece after move for promoted names; recompute
+  setMsg('あなた：'+fixText(m,0,txt));
+  if(endIfOver()){setMsg('つみ！ CPUの おうは もう にげられない。');finish();return;}
+  render();save();cpuTurn();}
+
+function fixText(m,side,fallback){
+  // after make, square m.t holds the moved piece
+  const mark=side?'☖':'☗';
+  if(m.f<0)return mark+sq(m.t)+KJ[m.d]+' （うつ）';
+  let a=Math.abs(S.p.b[m.t]);const base=m.p?a-8:a;
+  const k=base===8&&side?'玉':KJ[base];
+  return mark+sq(m.t)+k+(m.p?' なる':'');}
+
+function cpuTurn(){
+  ui.thinking=true;const my=++token;render();
+  const started=Date.now();
+  runThink(S.level,found=>{
+    if(my!==token)return;
+    // 指し手が早すぎないよう、最低でも CPU_DELAY ミリ秒は間をあける
+    const wait=CPU_DELAY-(Date.now()-started);
+    if(wait>0){setTimeout(()=>applyCpu(found,my),wait);}else applyCpu(found,my);});}
+
+function applyCpu(m,my){
+    if(my!==token)return;
+    ui.thinking=false;
+    if(!m){S.over='win';setMsg('CPUは もう うごけない。');finish();return;}
+    make(S.p,m);S.last={f:m.f,t:m.t};legalCache=null;
+    let t='CPU：'+fixText(m,1);
+    if(m.c)t+='<br>'+pieceName(Math.abs(m.c)>8?Math.abs(m.c)-8:Math.abs(m.c))+' を とられた';
+    if(endIfOver()){setMsg(t+'<br><b>つまされて しまった…</b>');finish();return;}
+    if(inCheck(S.p,0))t+='<br><b>おうて！ おうを まもろう</b>';
+    setMsg(t);render();save();}
+
+function finish(){ui.thinking=false;render();save();}
+
+function undo(){
+  if(ui.thinking||!S.history.length)return;
+  token++;restore(S.history.pop());legalCache=null;
+  ui.sel=null;ui.targets=[];ui.hint=null;ui.view=null;
+  setMsg('1て もどしました。');render();save();}
+
+function newGame(){token++;ui={sel:null,targets:[],view:null,hint:null,pending:null,confirmNew:false,thinking:false,hinting:false};
+  S=freshState(S?S.level:1);legalCache=null;setMsg(null);render();save();}
+
+function askHint(){
+  if(ui.thinking||ui.hinting||S.over||S.p.side!==0)return;
+  ui.hinting=true;const my=token;render();
+  runThink(3,m=>{ui.hinting=false;if(my!==token)return;
+    if(!m){render();return;}
+    ui.hint=m;ui.sel=null;ui.targets=[];
+    const what=m.f<0?'もちごまの '+NM[m.d]+' を '+sq(m.t)+' に うつ':NM[Math.abs(S.p.b[m.f])]+' を '+sq(m.t)+' へ うごかす'+(m.p?'（なる）':'');
+    setMsg('★ ヒント：'+what+' のが よさそう。ひかっている マスを みてね。');render();});}
+
+/* ---- input ---- */
+function clickCell(i){
+  if(ui.thinking){return;}
+  const v=S.p.b[i];
+  if(!S.over&&ui.sel&&ui.targets.includes(i)){
+    const cands=playerLegal().filter(m=>m.t===i&&(ui.sel.hand?(m.f<0&&m.d===ui.sel.hand):m.f===ui.sel.i));
+    if(cands.length===1)playerMove(cands[0]);
+    else if(cands.length>1){ui.pending=cands;openPromo(cands[0]);}
+    return;}
+  ui.hint=null;
+  if(v>0&&!S.over){
+    if(ui.sel&&ui.sel.i===i){ui.sel=null;ui.targets=[];ui.view=null;render();return;}
+    ui.sel={i};ui.targets=[...new Set(playerLegal().filter(m=>m.f===i).map(m=>m.t))];ui.view={t:v,g:false};
+    if(!ui.targets.length)setMsg('その '+NM[v]+' は いま うごかせない。');
+    else setMsg(NM[v]+' を えらんでいます。みどりの ■ に うごかせます。'+(ui.targets.some(t=>S.p.b[t]<0)?'あかい わくは あいての こまを とれる マス。':''));
+  }else if(v<0){ui.sel=null;ui.targets=[];ui.view={t:-v,g:true};setMsg('あいての '+NM[-v]+' です。うごきかたを みて きを つけよう。');}
+  else{ui.sel=null;ui.targets=[];ui.view=null;}
+  render();}
+
+function clickHand(t){
+  if(ui.thinking||S.over||S.p.side!==0)return;
+  ui.hint=null;
+  if(ui.sel&&ui.sel.hand===t){ui.sel=null;ui.targets=[];ui.view=null;render();return;}
+  ui.sel={hand:t};ui.targets=[...new Set(playerLegal().filter(m=>m.f<0&&m.d===t).map(m=>m.t))];ui.view={t,g:false};
+  setMsg('もちごまの '+NM[t]+'。みどりの ■ に うてます。'+(t===1?'（おなじ たての れつに ふが あると うてない）':''));
+  render();}
+
+function openPromo(m){const a=Math.abs(S.p.b[m.f]);$('promoTxt').textContent=KJ[a]+'（'+NM[a]+'） → '+KJ[a+8]+'（'+NM[a+8]+'）';$('promo').hidden=false;$('promoYes').focus();}
+function choosePromo(yes){$('promo').hidden=true;const c=ui.pending;ui.pending=null;if(!c)return;playerMove(c.find(m=>m.p===yes)||c[0]);}
+
+/* ---- render ---- */
+function pcHTML(v,small){const g=v<0,a=Math.abs(v);let k=KJ[a];if(a===8&&g)k='玉';
+  return '<div class="pc'+(g?' g':'')+(a>8?' pro':'')+(small?' sm':'')+'"><span>'+k+'</span></div>';}
+
+function renderBoard(){
+  const bd=$('board');let h='';const chk=S.p.side===0&&!S.over&&inCheck(S.p,0)?kingSq(S.p,0):-1;
+  const hf=ui.hint&&ui.hint.f>=0?ui.hint.f:-1,ht=ui.hint?ui.hint.t:-1;
+  for(let i=0;i<81;i++){const v=S.p.b[i];let cls='cell';
+    if(S.last&&S.last.t===i)cls+=' last';
+    if(i===chk)cls+=' chk';
+    if(ui.sel&&ui.sel.i===i)cls+=' sel';
+    if(ui.targets.includes(i))cls+=v?' cap':' move';
+    if(i===hf||i===ht)cls+=' hint';
+    const label=sq(i)+(v?(v<0?' あいての ':' じぶんの ')+NM[Math.abs(v)]:' あき');
+    h+='<button type="button" class="'+cls+'" data-i="'+i+'" aria-label="'+label+'">'+(v?pcHTML(v):'')+'</button>';}
+  [[3,3],[3,6],[6,3],[6,6]].forEach(([x,y])=>{h+='<div class="hoshi" style="left:'+(x/9*100)+'%;top:'+(y/9*100)+'%"></div>';});
+  bd.innerHTML=h;}
+
+function renderHand(side){
+  const el=$('hand'+side),hh=S.p.h[side];
+  let h='<span class="lbl">'+(side?'CPU':'あなた')+'</span>';let any=false;
+  for(const t of [7,6,5,4,3,2,1]){if(!hh[t])continue;any=true;
+    let cls='hp'+(side?'':' mine');if(!side&&ui.sel&&ui.sel.hand===t)cls+=' sel';
+    if(!side&&ui.hint&&ui.hint.f<0&&ui.hint.d===t)cls+=' hint';
+    const inner=pcHTML(side?-t:t,true)+(hh[t]>1?'<span class="cnt">x'+hh[t]+'</span>':'');
+    h+=side?'<div class="'+cls+'">'+inner+'</div>':'<button type="button" class="'+cls+'" data-h="'+t+'" aria-label="もちごま '+NM[t]+' '+hh[t]+'まい" style="background:'+(cls.includes('sel')?'':'none')+';border:0;font:inherit">'+inner+'</button>';}
+  if(!any)h+='<span class="cnt">もちごま なし</span>';
+  el.innerHTML=h;}
+
+function renderGuide(){
+  const mini=$('mini');const v=ui.view;let cells=Array(25).fill('');
+  if(!v){$('gtitle').textContent='こまの うごき';$('gdesc').textContent='こまを タップすると うごきかたが でるよ。あいての こまも しらべられる。';
+    mini.innerHTML=cells.map(()=>'<div></div>').join('');return;}
+  const t=v.t;cells[12]='me';
+  const flip=v.g?-1:1;
+  for(const [dr,dc] of STEPS[t]){const r=2+dr*flip,c=2+dc*flip;cells[r*5+c]='ok';}
+  const ARW={'-1,0':'↑','1,0':'↓','0,-1':'←','0,1':'→','-1,-1':'↖','-1,1':'↗','1,-1':'↙','1,1':'↘'};
+  const arrows={};
+  for(const [dr,dc] of SLIDES[t]){const a=dr*flip,b=dc*flip;cells[(2+a)*5+2+b]='ok';cells[(2+2*a)*5+2+2*b]='ok';arrows[(2+2*a)*5+2+2*b]=ARW[a+','+b];}
+  const k=(t===8&&v.g)?'玉':KJ[t];
+  mini.innerHTML=cells.map((c,i)=>'<div class="'+c+'">'+(c==='me'?k:(arrows[i]||''))+'</div>').join('');
+  $('gtitle').textContent=(v.g?'あいての ':'')+NM[t]+'（'+k+'）の うごき';
+  $('gdesc').textContent=DESC[t]+(v.g?'（あいては したむき）':'');}
+
+function render(){
+  renderBoard();renderHand(0);renderHand(1);renderGuide();
+  const turn=$('turn');
+  if(S.over)turn.innerHTML=S.over==='win'?'★ あなたの かち！':'CPUの かち';
+  else if(ui.thinking)turn.innerHTML='CPUが かんがえちゅう<span class="blink">…</span>';
+  else turn.innerHTML='<span class="blink">▶</span> あなたの ばん';
+  let m=S.msg;
+  if(!m)m=S.p.side===0&&!S.history.length?'あなたの さきてです。うごかしたい こまを タップしてね。':'うごかしたい こまを タップしてね。';
+  if(ui.hinting)m='ヒントを かんがえちゅう…';
+  $('msg').innerHTML=m;
+  for(let l=0;l<3;l++)$('lv'+l).setAttribute('aria-pressed',S.level===l?'true':'false');
+  $('undoBtn').style.opacity=(ui.thinking||!S.history.length)?.5:1;
+  $('hintBtn').style.opacity=(ui.thinking||S.over)?.5:1;
+  const nb=$('newBtn');nb.textContent=ui.confirmNew?'もういちど おすと はじめから':'↺ はじめから';nb.classList.toggle('warn',ui.confirmNew);
+  const ov=$('over');
+  if(S.over&&!ov.dataset.shown){ov.hidden=false;ov.dataset.shown='1';
+    $('overTitle').textContent=S.over==='win'?'★ あなたの かち！ ★':'まけ…';
+    $('overTxt').textContent=S.over==='win'?'おみごと！ つよさ「'+LVNAME[S.level]+'」に かちました。':'「まった」で もどって やりなおす ことも できるよ。';}
+  if(!S.over){ov.hidden=true;delete ov.dataset.shown;}}
+
+/* ---- events ---- */
+$('board').addEventListener('click',e=>{const b=e.target.closest('.cell');if(b)clickCell(+b.dataset.i);});
+$('hand0').addEventListener('click',e=>{const b=e.target.closest('[data-h]');if(b)clickHand(+b.dataset.h);});
+$('hintBtn').onclick=askHint;
+$('undoBtn').onclick=undo;
+$('seg').addEventListener('click',e=>{const b=e.target.closest('[data-lv]');if(!b)return;S.level=+b.dataset.lv;setMsg('つよさを「'+LVNAME[S.level]+'」に しました。');render();save();});
+$('newBtn').onclick=()=>{
+  if(!S.history.length&&!S.over){newGame();return;}
+  if(ui.confirmNew){newGame();return;}
+  ui.confirmNew=true;render();setTimeout(()=>{if(ui.confirmNew){ui.confirmNew=false;render();}},3000);};
+$('promoYes').onclick=()=>choosePromo(true);
+$('promoNo').onclick=()=>choosePromo(false);
+$('overNew').onclick=()=>{$('over').hidden=true;newGame();};
+$('overUndo').onclick=()=>{$('over').hidden=true;undo();};
+
+/* ---- boot ---- */
+function begin(){$('title').hidden=true;render();if(!S.over&&S.p.side===1)cpuTurn();}
+$('tContinue').onclick=begin;
+$('tNew').onclick=()=>{newGame();begin();};
+function start(data){
+  // ホットリロード（ページの更新が届いたとき）は対局をそのまま続け、ふつうに開いたときはタイトル画面から
+  if(data&&data.cur){deserialize(data);begin();return;}
+  if(!load())S=freshState(1);
+  render();
+  const resumable=S.history.length>0&&!S.over;
+  $('tContinue').hidden=!resumable;
+  const tt=$('title');tt.classList.add('intro');tt.hidden=false;
+  // 数秒タイトルを見せてから「さいしょから／つづきから」を出す
+  setTimeout(()=>{tt.classList.remove('intro');(resumable?$('tContinue'):$('tNew')).focus();},2200);}
+if(window.claude&&window.claude.hot&&window.claude.hot.snapshot)window.claude.hot.snapshot(()=>serialize());
+if(window.claude&&window.claude.hot&&window.claude.hot.ready)window.claude.hot.ready(start);
+else start(window.claude&&window.claude.hot&&window.claude.hot.data||{});
+</script>
+
+</body>
+</html>
