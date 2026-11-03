@@ -83,8 +83,11 @@ h1{font-size:28px;font-weight:400;margin:0;color:var(--yellow);letter-spacing:.1
 .btn:active{transform:translate(4px,4px);box-shadow:2px 2px 0 0 var(--cream)}
 .btn:focus-visible{outline-color:var(--w)}
 .btn.warn{background:var(--red);color:var(--w)}
-.seg{display:flex;gap:6px}
-.seg button{flex:1;font-family:inherit;text-align:center;font-size:13px;padding:5px 0;border:3px solid var(--k);background:var(--yellow);color:var(--k);cursor:pointer;border-radius:0}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg button.oni{background:var(--red);color:var(--w)}
+.seg button.oni[aria-pressed="true"]{background:var(--k);color:var(--red)}
+.lvnote{font-size:12px;line-height:1.5;margin-top:6px;min-height:1.5em}
+.seg button{font-family:inherit;text-align:center;font-size:13px;padding:5px 0;border:3px solid var(--k);background:var(--yellow);color:var(--k);cursor:pointer;border-radius:0}
 .seg button[aria-pressed="true"]{background:var(--k);color:var(--yellow)}
 .guide{display:flex;gap:10px;align-items:center}
 .gdesc{font-size:13px;line-height:1.6;flex:1;min-width:0}
@@ -135,8 +138,8 @@ h1{font-size:28px;font-weight:400;margin:0;color:var(--yellow);letter-spacing:.1
     <button class="btn" id="hintBtn" type="button">★ ヒントを みる</button>
     <button class="btn" id="undoBtn" type="button">◀ まった（1て もどす）</button>
     <div class="card"><h2>つよさ</h2><div class="seg" id="seg">
-      <button type="button" id="lv0" data-lv="0">やさしい</button><button type="button" id="lv1" data-lv="1">ふつう</button><button type="button" id="lv2" data-lv="2">つよい</button>
-    </div></div>
+      <button type="button" id="lv0" data-lv="0">やさしい</button><button type="button" id="lv1" data-lv="1">ふつう</button><button type="button" id="lv2" data-lv="2">つよい</button><button type="button" id="lv3" data-lv="3" class="oni">おに</button>
+    </div><div class="lvnote" id="lvnote"></div></div>
     <button class="btn" id="newBtn" type="button">↺ はじめから</button>
   </div>
 </div>
@@ -263,14 +266,317 @@ function think(p,level){
   return best;}
 </script>
 
+<script id="oni" type="text/plain">
+/* ===== おに：つよい CPU 用の思考エンジン =====
+   手を整数で表し、局面を覚える表（置換表）、有望でない手を浅く読む工夫、
+   駒の位置・王の危なさ・囲いの形を見る評価、定跡、詰み探索を備える */
+var ONI=(function(){
+  /* 方向: 0上 1下 2左 3右 4左上 5右上 6左下 7右下 8-9 先手の桂 10-11 後手の桂（先手から見た向き） */
+  var DR=[-1,1,0,0,-1,-1,1,1,-2,-2,2,2],DC=[0,0,-1,1,-1,1,-1,1,-1,1,-1,1],OPP=[1,0,3,2,7,6,5,4,11,10,9,8];
+  var NB=new Int8Array(12*81),d,sq,t,s;
+  for(d=0;d<12;d++)for(sq=0;sq<81;sq++){var rr=((sq/9)|0)+DR[d],cc=sq%9+DC[d];NB[d*81+sq]=(rr<0||rr>8||cc<0||cc>8)?-1:rr*9+cc;}
+  var GD=[0,1,2,3,4,5];
+  var ST0=[[],[0],[],[8,9],[0,4,5,6,7],GD,[],[],[0,1,2,3,4,5,6,7],GD,GD,GD,GD,[],[0,1,2,3],[4,5,6,7]];
+  var SL0=[[],[],[0],[],[],[],[4,5,6,7],[0,1,2,3],[],[],[],[],[],[],[4,5,6,7],[0,1,2,3]];
+  var STEP=[[],[]],SLIDE=[[],[]],SM=[new Int32Array(16),new Int32Array(16)],LM=[new Int32Array(16),new Int32Array(16)];
+  for(t=0;t<16;t++){
+    STEP[0][t]=ST0[t];SLIDE[0][t]=SL0[t];
+    STEP[1][t]=ST0[t].map(function(x){return OPP[x];});SLIDE[1][t]=SL0[t].map(function(x){return OPP[x];});
+    for(s=0;s<2;s++){var a1=0,l1=0,k;for(k=0;k<STEP[s][t].length;k++)a1|=1<<STEP[s][t][k];for(k=0;k<SLIDE[s][t].length;k++)l1|=1<<SLIDE[s][t][k];SM[s][t]=a1;LM[s][t]=l1;}}
+
+  var V=[0,100,280,320,480,550,800,950,0,540,500,500,530,0,1050,1250];
+  var HV=[0,115,310,350,540,610,900,1060];
+  var MATE=30000,INF=32000;
+
+  /* 局面 */
+  var b=new Int8Array(81),hand=new Int8Array(16),side=0,ksq=new Int32Array(2),hlo=0,hhi=0;
+  /* 局面のハッシュ（ゾブリスト） */
+  var seed=0x2545F491;function rnd(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return seed|0;}
+  var ZL=new Int32Array(31*81),ZH=new Int32Array(31*81),HZL=new Int32Array(16*20),HZH=new Int32Array(16*20),SZL=rnd(),SZH=rnd(),i;
+  for(i=0;i<ZL.length;i++){ZL[i]=rnd();ZH[i]=rnd();}
+  for(i=0;i<HZL.length;i++){HZL[i]=rnd();HZH[i]=rnd();}
+  function zp(v,q){return (v+15)*81+q;}
+  function rehash(){hlo=0;hhi=0;for(var q=0;q<81;q++)if(b[q]){var j=zp(b[q],q);hlo^=ZL[j];hhi^=ZH[j];}
+    for(var k=0;k<16;k++){var j2=k*20+hand[k];hlo^=HZL[j2];hhi^=HZH[j2];}if(side){hlo^=SZL;hhi^=SZH;}}
+  function load(p){b.set(p.b);for(var k=0;k<8;k++){hand[k]=p.h[0][k]||0;hand[8+k]=p.h[1][k]||0;}side=p.side;
+    ksq[0]=-1;ksq[1]=-1;for(var q=0;q<81;q++){if(b[q]===8)ksq[0]=q;else if(b[q]===-8)ksq[1]=q;}rehash();}
+
+  /* by 側の駒が q に利いているか */
+  function attacked(q,by){
+    if(q<0)return false;var sg=by?-1:1,dd,tt,v,od;
+    for(dd=0;dd<8;dd++){tt=NB[dd*81+q];if(tt<0)continue;v=b[tt];od=OPP[dd];
+      if(v){if((v>0)===(sg>0)){var a=v*sg;if(((SM[by][a]|LM[by][a])>>od)&1)return true;}continue;}
+      tt=NB[dd*81+tt];
+      while(tt>=0){v=b[tt];if(v){if((v>0)===(sg>0)&&((LM[by][v*sg]>>od)&1))return true;break;}tt=NB[dd*81+tt];}}
+    if(by===0){tt=NB[11*81+q];if(tt>=0&&b[tt]===3)return true;tt=NB[10*81+q];if(tt>=0&&b[tt]===3)return true;}
+    else{tt=NB[8*81+q];if(tt>=0&&b[tt]===-3)return true;tt=NB[9*81+q];if(tt>=0&&b[tt]===-3)return true;}
+    return false;}
+
+  /* 指し手 = to | from<<7 | なる<<14 | 打つ駒<<15 */
+  var MAXP=128,SLOT=700,MV=new Int32Array(MAXP*SLOT),MS=new Float64Array(MAXP*SLOT);
+  function inZ(r,s2){return s2?r>=6:r<=2;}
+  function addM(n,a,from,to,r,s2){
+    var tr=(to/9)|0;
+    if(a<=7&&a!==5&&(inZ(r,s2)||inZ(tr,s2))){
+      var rr2=s2?8-tr:tr,must=((a===1||a===2)&&rr2===0)||(a===3&&rr2<=1);
+      MV[n++]=to|(from<<7)|(1<<14);
+      if(!must&&a!==1&&a!==6&&a!==7)MV[n++]=to|(from<<7);
+    }else MV[n++]=to|(from<<7);
+    return n;}
+  function gen(base,caps){
+    var n=base,sg=side?-1:1,s2=side,q,v,a,r,st,sl,k,tt,w,dd;
+    for(q=0;q<81;q++){v=b[q];if(!v||(v>0)!==(sg>0))continue;a=v*sg;r=(q/9)|0;
+      st=STEP[s2][a];
+      for(k=0;k<st.length;k++){tt=NB[st[k]*81+q];if(tt<0)continue;w=b[tt];if(w&&(w>0)===(sg>0))continue;if(caps&&!w)continue;n=addM(n,a,q,tt,r,s2);}
+      sl=SLIDE[s2][a];
+      for(k=0;k<sl.length;k++){dd=sl[k];tt=NB[dd*81+q];
+        while(tt>=0){w=b[tt];if(w&&(w>0)===(sg>0))break;if(!caps||w)n=addM(n,a,q,tt,r,s2);if(w)break;tt=NB[dd*81+tt];}}}
+    if(caps)return n;
+    var pf=0,ty=[],h0=s2*8;
+    for(q=0;q<81;q++)if(b[q]===sg)pf|=1<<(q%9);
+    for(t=1;t<=7;t++)if(hand[h0+t])ty.push(t);
+    if(!ty.length)return n;
+    for(q=0;q<81;q++){if(b[q])continue;r=(q/9)|0;var rr3=s2?8-r:r;
+      for(k=0;k<ty.length;k++){t=ty[k];
+        if((t===1||t===2)&&rr3===0)continue;if(t===3&&rr3<=1)continue;if(t===1&&((pf>>(q%9))&1))continue;
+        MV[n++]=q|(t<<15);}}
+    return n;}
+
+  /* 指す・戻す */
+  var CAP=new Int8Array(MAXP+2),HL=new Int32Array(MAXP+2),HH=new Int32Array(MAXP+2);
+  function make(m,ply){HL[ply]=hlo;HH[ply]=hhi;
+    var to=m&127,from=(m>>7)&127,pr=(m>>14)&1,dr=(m>>15)&7,sg=side?-1:1,j,k2,c,v,w,nv,a;
+    if(dr){v=sg*dr;b[to]=v;j=zp(v,to);hlo^=ZL[j];hhi^=ZH[j];k2=side*8+dr;c=hand[k2];
+      hlo^=HZL[k2*20+c]^HZL[k2*20+c-1];hhi^=HZH[k2*20+c]^HZH[k2*20+c-1];hand[k2]=c-1;CAP[ply]=0;}
+    else{v=b[from];w=b[to];CAP[ply]=w;j=zp(v,from);hlo^=ZL[j];hhi^=ZH[j];
+      if(w){j=zp(w,to);hlo^=ZL[j];hhi^=ZH[j];a=w<0?-w:w;if(a>8)a-=8;k2=side*8+a;c=hand[k2];
+        hlo^=HZL[k2*20+c]^HZL[k2*20+c+1];hhi^=HZH[k2*20+c]^HZH[k2*20+c+1];hand[k2]=c+1;}
+      nv=pr?v+8*sg:v;b[to]=nv;b[from]=0;j=zp(nv,to);hlo^=ZL[j];hhi^=ZH[j];
+      if(v===8*sg)ksq[side]=to;}
+    side^=1;hlo^=SZL;hhi^=SZH;}
+  function unmake(m,ply){side^=1;
+    var to=m&127,from=(m>>7)&127,pr=(m>>14)&1,dr=(m>>15)&7,sg=side?-1:1,v,w,a;
+    if(dr){b[to]=0;hand[side*8+dr]++;}
+    else{v=pr?b[to]-8*sg:b[to];b[from]=v;w=CAP[ply];b[to]=w;if(w){a=w<0?-w:w;if(a>8)a-=8;hand[side*8+a]--;}if(v===8*sg)ksq[side]=from;}
+    hlo=HL[ply];hhi=HH[ply];}
+  function moverInCheck(){return attacked(ksq[side^1],side);}
+  function hasLegal(ply){var base=ply*SLOT,n=gen(base,false);
+    for(var j=base;j<n;j++){make(MV[j],ply);var ok=!moverInCheck();unmake(MV[j],ply);if(ok)return true;}return false;}
+  /* 打ち歩詰め（指した直後に呼ぶ） */
+  function isUchifuzume(m,ply){
+    if(((m>>15)&7)!==1)return false;var to=m&127,sgm=(side^1)?-1:1;
+    if(ksq[side]!==to-9*sgm)return false;
+    return !hasLegal(ply+1);}
+
+  /* 評価 */
+  var ATT=new Int8Array(162),MOB=[0,0];
+  function pst(a,r,c){
+    switch(a){
+      case 1:return r<=2?30:r===3?20:r===4?10:r===5?4:0;
+      case 3:return r<=4?15:0;
+      case 4:return r<=3?15:(r>=5&&r<=7)?8:0;
+      case 7:return r<=2?50:0;
+      case 15:return r<=2?40:10;
+      case 14:return r>=6?40:20;
+      case 8:return (r===8?20:r===7?10:-25*(7-r))+((c<=2||c>=6)?15:0);
+      default:return 0;}}
+  /* 囲い：先手から見た [玉の場所, [[場所,駒],...]]。左右反転も自動で入れる */
+  var CASTLES=[[[7,7],[[7,6,4],[8,5,5],[7,4,5]]],[[7,1],[[7,2,5],[6,2,4],[6,3,5]]],[[8,0],[[7,0,2],[7,1,4],[8,2,5]]],[[7,2],[[8,3,5],[7,4,5],[8,2,4]]]];
+  var CS=[];
+  CASTLES.forEach(function(cs){[0,1].forEach(function(mir){var f=function(c){return mir?8-c:c;};
+    CS.push({k:cs[0][0]*9+f(cs[0][1]),p:cs[1].map(function(x){return [x[0]*9+f(x[1]),x[2]];})});});});
+  function norm(q,s2){return s2?80-q:q;}
+  function castle(s2){var k=ksq[s2];if(k<0)return 0;var nk=norm(k,s2),sg=s2?-1:1,best=0;
+    for(var j=0;j<CS.length;j++){if(CS[j].k!==nk)continue;var got=0,pp=CS[j].p;
+      for(var u=0;u<pp.length;u++){if(b[norm(pp[u][0],s2)]===sg*pp[u][1])got++;}
+      var sc=25+35*got;if(sc>best)best=sc;}
+    return best;}
+  function kingSafety(s2){var k=ksq[s2];if(k<0)return 0;var e=1-s2,kr=(k/9)|0,kc=k%9,fw=s2?1:-1,att=0,def=0,sg=s2?-1:1,r,c,q,v;
+    for(r=kr-1;r<=kr+1;r++)for(c=kc-1;c<=kc+1;c++){if(r<0||r>8||c<0||c>8)continue;q=r*9+c;att+=ATT[e*81+q]*(q===k?2:1);def+=ATT[s2*81+q];
+      v=b[q]*sg;if(v===4||v===5||(v>=9&&v<=12))def++;}
+    r=kr+2*fw;if(r>=0&&r<=8)for(c=kc-1;c<=kc+1;c++){if(c<0||c>8)continue;att+=ATT[e*81+r*9+c];}
+    var he=e*8,hw=hand[he+7]*3+hand[he+6]*2.5+(hand[he+5]+hand[he+4])*1.5+(hand[he+3]+hand[he+2]+hand[he+1])*0.7;
+    var danger=att*2+hw-def;
+    return Math.min(80,def*8)-(danger>0?Math.min(2500,danger*danger*6):0);}
+  function evaluate(){
+    ATT.fill(0);MOB[0]=0;MOB[1]=0;var sc=0,q,v,s2,sg,a,r,c,st,sl,k,tt,dd;
+    for(q=0;q<81;q++){v=b[q];if(!v)continue;s2=v>0?0:1;sg=s2?-1:1;a=v*sg;r=(q/9)|0;c=q%9;
+      var x=V[a]+pst(a,s2?8-r:r,s2?8-c:c);sc+=s2?-x:x;
+      st=STEP[s2][a];for(k=0;k<st.length;k++){tt=NB[st[k]*81+q];if(tt>=0)ATT[s2*81+tt]++;}
+      sl=SLIDE[s2][a];for(k=0;k<sl.length;k++){dd=sl[k];tt=NB[dd*81+q];while(tt>=0){ATT[s2*81+tt]++;MOB[s2]++;if(b[tt])break;tt=NB[dd*81+tt];}}}
+    for(t=1;t<=7;t++)sc+=(hand[t]-hand[8+t])*HV[t];
+    sc+=(MOB[0]-MOB[1])*2+kingSafety(0)-kingSafety(1)+castle(0)-castle(1);
+    return side?-sc:sc;}
+
+  /* 置換表・手の並べ替え */
+  var TTS=1<<19,TTM=TTS-1,TK=new Int32Array(TTS),TMv=new Int32Array(TTS),TSc=new Int32Array(TTS),TD=new Int8Array(TTS),TF=new Int8Array(TTS);
+  var KIL=new Int32Array(MAXP*2),HIS=new Float64Array(88*81),nodes=0,stopT=0,abort=false;
+  function hidx(m){var dr=(m>>15)&7;return (dr?80+dr:((m>>7)&127))*81+(m&127);}
+  function score(base,n,ttm,ply){
+    for(var j=base;j<n;j++){var m=MV[j],sc,to=m&127,dr=(m>>15)&7;
+      if(m===ttm)sc=1e12;
+      else if(!dr&&b[to]){var w=b[to],f=b[(m>>7)&127];sc=1e10+V[w<0?-w:w]*16-V[f<0?-f:f];}
+      else if((m>>14)&1)sc=9e9;
+      else if(m===KIL[ply*2]||m===KIL[ply*2+1])sc=8e9;
+      else sc=HIS[hidx(m)];
+      MS[j]=sc;}}
+  function pick(j,n){var bj=j,bs=MS[j];for(var u=j+1;u<n;u++)if(MS[u]>bs){bs=MS[u];bj=u;}
+    if(bj!==j){var tm=MV[j];MV[j]=MV[bj];MV[bj]=tm;var ts=MS[j];MS[j]=MS[bj];MS[bj]=ts;}return MV[j];}
+  function tick(){if((++nodes&2047)===0&&Date.now()>stopT)abort=true;return abort;}
+
+  /* 駒の取り合いを最後まで読む（王手されていれば逃げ方も読む） */
+  function qs(alpha,beta,ply,qd){
+    if(tick())return 0;
+    var inC=attacked(ksq[side],side^1);
+    if(ply>=MAXP-1)return evaluate();
+    var stand=-INF,base=ply*SLOT,n,j,m,v,legal=0;
+    if(!inC||qd>=6){stand=evaluate();if(stand>=beta)return stand;if(stand>alpha)alpha=stand;n=gen(base,true);}
+    else n=gen(base,false);
+    score(base,n,0,ply);
+    for(j=base;j<n;j++){m=pick(j,n);
+      if(!inC){var w=b[m&127],aw=w<0?-w:w;if(stand+V[aw]+250<alpha&&!((m>>14)&1))continue;}
+      make(m,ply);if(moverInCheck()||isUchifuzume(m,ply)){unmake(m,ply);continue;}
+      legal++;v=-qs(-beta,-alpha,ply+1,qd+1);unmake(m,ply);if(abort)return 0;
+      if(v>alpha){alpha=v;if(v>=beta)return v;}}
+    if(inC&&qd<6&&!legal)return -MATE+ply;
+    return alpha;}
+
+  function search(depth,alpha,beta,ply,allowNull){
+    if(tick())return 0;
+    if(ply>=MAXP-2)return evaluate();
+    var inC=attacked(ksq[side],side^1);
+    if(inC&&ply<40)depth++;
+    if(depth<=0)return qs(alpha,beta,ply,0);
+    var idx=hlo&TTM,ttm=0,a0=alpha;
+    if(TK[idx]===hhi){ttm=TMv[idx];
+      if(TD[idx]>=depth){var ts=TSc[idx],tf=TF[idx];if(ts>MATE-300)ts-=ply;else if(ts<-MATE+300)ts+=ply;
+        if(tf===0)return ts;if(tf===1&&ts>=beta)return ts;if(tf===2&&ts<=alpha)return ts;}}
+    if(allowNull&&!inC&&depth>=3&&beta<MATE-300&&beta>-MATE+300){
+      if(evaluate()>=beta){side^=1;hlo^=SZL;hhi^=SZH;
+        var nv=-search(depth-1-(depth>=6?3:2),-beta,-beta+1,ply+1,false);
+        side^=1;hlo^=SZL;hhi^=SZH;if(abort)return 0;if(nv>=beta)return beta;}}
+    var base=ply*SLOT,n=gen(base,false),j,m,v,best=-INF,bestM=0,legal=0;
+    score(base,n,ttm,ply);
+    for(j=base;j<n;j++){m=pick(j,n);
+      var to=m&127,dr=(m>>15)&7,cap=!dr&&b[to]!==0,pr=(m>>14)&1;
+      make(m,ply);
+      if(moverInCheck()||isUchifuzume(m,ply)){unmake(m,ply);continue;}
+      legal++;
+      var gc=attacked(ksq[side],side^1);
+      if(legal===1)v=-search(depth-1,-beta,-alpha,ply+1,true);
+      else{var red=0;
+        if(depth>=3&&!cap&&!pr&&!inC&&!gc&&legal>4&&m!==KIL[ply*2]&&m!==KIL[ply*2+1])red=legal>12?2:1;
+        v=-search(depth-1-red,-alpha-1,-alpha,ply+1,true);
+        if(!abort&&v>alpha&&red)v=-search(depth-1,-alpha-1,-alpha,ply+1,true);
+        if(!abort&&v>alpha&&v<beta)v=-search(depth-1,-beta,-alpha,ply+1,true);}
+      unmake(m,ply);if(abort)return 0;
+      if(v>best){best=v;bestM=m;
+        if(v>alpha){alpha=v;
+          if(v>=beta){if(!cap){if(KIL[ply*2]!==m){KIL[ply*2+1]=KIL[ply*2];KIL[ply*2]=m;}HIS[hidx(m)]+=depth*depth;}break;}}}}
+    if(!legal)return -MATE+ply;
+    var sc=best;if(sc>MATE-300)sc+=ply;else if(sc<-MATE+300)sc-=ply;
+    if(TK[idx]!==hhi||TD[idx]<=depth){TK[idx]=hhi;TMv[idx]=bestM;TSc[idx]=sc;TD[idx]=depth;TF[idx]=best>=beta?1:(best>a0?0:2);}
+    return best;}
+
+  /* 詰み探索：王手だけを続けて詰むかどうか */
+  function mateAtk(depth,ply){
+    if(tick()||ply>=MAXP-2)return 0;
+    var base=ply*SLOT,n=gen(base,false);score(base,n,0,ply);
+    for(var j=base;j<n;j++){var m=pick(j,n);make(m,ply);
+      if(moverInCheck()||!attacked(ksq[side],side^1)||isUchifuzume(m,ply)){unmake(m,ply);continue;}
+      var ok=mateDef(depth-1,ply+1);unmake(m,ply);if(abort)return 0;if(ok)return m;}
+    return 0;}
+  function mateDef(depth,ply){
+    if(tick()||ply>=MAXP-2)return false;
+    var base=ply*SLOT,n=gen(base,false);
+    for(var j=base;j<n;j++){var m=MV[j];make(m,ply);if(moverInCheck()){unmake(m,ply);continue;}
+      var mated=depth>1&&mateAtk(depth-1,ply+1)!==0;unmake(m,ply);if(abort)return false;if(!mated)return false;}
+    return true;}
+
+  /* 定跡（よくある序盤）。指せない手が出たらその筋はそこで打ち切る */
+  var LINES=[
+    '7g7f 3c3d 2g2f 4c4d 2f2e 2b3c 4i5h 8b4b 5i6h 3a3b 6h7h 5a6b 3i4h 6b7b 5g5f 7b8b 4h5g 7a7b',
+    '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d 2b3c',
+    '7g7f 8c8d 2g2f 8d8e 8h7g 3c3d 7i8h 2b7g+ 8h7g 3a2b',
+    '2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d P*2c 2d2f 8e8f 8g8f 8b8f P*8g 8f8d 7g7f 3c3d',
+    '2g2f 3c3d 7g7f 4c4d 3i4h 8b4b 5i6h 5a6b 6h7h 6b7b 5g5f 7b8b',
+    '7g7f 3c3d 6g6f 8c8d 2h6h 8d8e 8h7g 7a6b',
+    '5g5f 3c3d 2g2f 8c8d 2f2e 8d8e','6g6f 3c3d 7g7f 8c8d','7g7f 3c3d 2h7h 8c8d',
+    '1g1f 3c3d','9g9f 3c3d','3g3f 8c8d','4g4f 3c3d','5i5h 3c3d','6i7h 3c3d 7g7f 8c8d','8h2b+ 3a2b'];
+  var BOOK=null,PC={P:1,L:2,N:3,S:4,G:5,B:6,R:7};
+  function usiSq(f,rk){return (rk.charCodeAt(0)-97)*9+(9-(+f));}
+  function usi(u){if(u[1]==='*')return usiSq(u[2],u[3])|(PC[u[0]]<<15);
+    return usiSq(u[2],u[3])|(usiSq(u[0],u[1])<<7)|(u[4]==='+'?1<<14:0);}
+  function startPos(){var p={b:new Int8Array(81),h:[[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0]],side:0},bk=[2,3,4,5,8,5,4,3,2];
+    for(var c=0;c<9;c++){p.b[c]=-bk[c];p.b[72+c]=bk[c];p.b[18+c]=-1;p.b[54+c]=1;}p.b[10]=-7;p.b[16]=-6;p.b[64]=6;p.b[70]=7;return p;}
+  function buildBook(){BOOK={};
+    LINES.forEach(function(line){load(startPos());var ms=line.split(' ');
+      for(var j=0;j<ms.length;j++){var m=usi(ms[j]),n=gen(0,false),ok=false;
+        for(var u=0;u<n;u++)if(MV[u]===m){ok=true;break;}
+        if(!ok)break;make(m,0);if(moverInCheck()){break;}
+        unmake(m,0);var key=hhi+':'+hlo;(BOOK[key]=BOOK[key]||[]);if(BOOK[key].indexOf(m)<0)BOOK[key].push(m);make(m,0);}});}
+  function bookMove(){if(!BOOK)buildBook();var e=BOOK[hhi+':'+hlo];return e?e[Math.floor(Math.random()*e.length)]:0;}
+
+  function toObj(m){var dr=(m>>15)&7;return {f:dr?-1:(m>>7)&127,t:m&127,d:dr,p:!!((m>>14)&1),c:0};}
+  var info={};
+  function think(p,ms){
+    var start=Date.now();info={depth:0,nodes:0,score:0,book:false,mate:false};
+    if(BOOK===null)buildBook();
+    load(p);var bk=bookMove();if(bk){info.book=true;return toObj(bk);}
+    nodes=0;abort=false;HIS.fill(0);KIL.fill(0);
+    /* 1. 詰みがあるか先に探す */
+    stopT=start+Math.min(ms*0.15,1800);
+    for(var md=1;md<=9;md+=2){var mm=mateAtk(md,0);if(abort)break;if(mm){info.mate=true;info.depth=md;return toObj(mm);}}
+    /* 2. 指せる手を並べる */
+    abort=false;stopT=start+ms;
+    var n=gen(0,false),root=[],j;score(0,n,0,0);
+    for(j=0;j<n;j++){var m=pick(j,n);make(m,0);var ill=moverInCheck()||isUchifuzume(m,0);unmake(m,0);if(!ill)root.push(m);}
+    if(!root.length)return null;
+    if(root.length===1)return toObj(root[0]);
+    var best=root[0],rs=new Array(root.length);
+    /* 3. 少しずつ深く読む */
+    for(var depth=1;depth<=40;depth++){
+      var alpha=-INF,curBest=0,curScore=-INF,done=0;
+      for(j=0;j<root.length;j++){var rm=root[j],v;make(rm,0);
+        if(j===0)v=-search(depth-1,-INF,-alpha,1,true);
+        else{v=-search(depth-1,-alpha-1,-alpha,1,true);if(!abort&&v>alpha)v=-search(depth-1,-INF,-alpha,1,true);}
+        unmake(rm,0);if(abort)break;
+        rs[j]=v;done++;if(v>curScore){curScore=v;curBest=rm;}if(v>alpha)alpha=v;}
+      if(abort){if(done>0&&curBest)best=curBest;break;}
+      best=curBest;info.depth=depth;info.score=curScore;
+      var order=root.map(function(x,k){return {m:x,v:rs[k]};});
+      order.sort(function(x,y){return (y.m===best)-(x.m===best)||y.v-x.v;});
+      root=order.map(function(x){return x.m;});
+      if(curScore>MATE-300||curScore<-MATE+300)break;
+      if(Date.now()-start>ms*0.45)break;}
+    info.nodes=nodes;
+    return toObj(best);}
+  /* 動作確認用：この局面の合法手 */
+  function legalList(p){load(p);var n=gen(0,false),out=[];
+    for(var j=0;j<n;j++){var m=MV[j];make(m,0);var ill=moverInCheck()||isUchifuzume(m,0);unmake(m,0);if(!ill)out.push(toObj(m));}return out;}
+  return {think:think,info:function(){return info;},legal:legalList};
+})();
+/* 強さ 0〜2 はこれまでのエンジン、3（おに）と 4（ヒント）は ONI。返す手は必ず合法手の一覧と照らし合わせる */
+function thinkAny(p,level){
+  if(level===3||level===4){
+    try{var m=ONI.think(p,level===3?12000:2500),L=legal(p,false);
+      if(!L.length)return null;
+      if(m)for(var i=0;i<L.length;i++){var x=L[i];if(x.f===m.f&&x.t===m.t&&x.d===m.d&&x.p===m.p)return x;}
+    }catch(e){}
+    return think(p,2);}
+  return think(p,level);}
+</script>
+
 <script>
 (0,eval)(document.getElementById('engine').textContent);
+(0,eval)(document.getElementById('oni').textContent);
 
 const KJ=['','歩','香','桂','銀','金','角','飛','王','と','杏','圭','全','','馬','龍'];
 const NM=['','ふ','きょうしゃ','けいま','ぎん','きん','かく','ひしゃ','おう','と','なりきょう','なりけい','なりぎん','','うま','りゅう'];
 const DESC=['','まえに 1マス すすめる','まえに どこまでも すすめる','まえに 2マス・よこに 1マスの ばしょへ とびこえる','ななめ と まえに 1マス','うしろの ななめ いがいの 6ほうこうに 1マス','ななめに どこまでも すすめる','たて と よこに どこまでも すすめる','まわりの 8マス どこでも 1マス','きん と おなじ うごき','きん と おなじ うごき','きん と おなじ うごき','きん と おなじ うごき','','かくの うごき ＋ たてよこ 1マス','ひしゃの うごき ＋ ななめ 1マス'];
 const DAN='一二三四五六七八九';
-const LVNAME=['やさしい','ふつう','つよい'];
+const LVNAME=['やさしい','ふつう','つよい','おに'];
+const LVNOTE=['ときどき うっかり ミスを する','すこし さきを よむ','5て さきまで よむ','じょうせき・つみ さがしつき。1てに さいだい 12びょう かんがえる'];
 const SAVE_KEY='dot-shogi-v1';
 const CPU_DELAY=500;
 const $=id=>document.getElementById(id);
@@ -300,8 +606,8 @@ function playerLegal(){if(!legalCache)legalCache=legal(S.p,false);return legalCa
 /* ---- worker ---- */
 let worker=null,workerCb={};
 try{
-  const src=document.getElementById('engine').textContent+
-    '\nonmessage=function(e){var d=e.data,p={b:Int8Array.from(d.b),h:[d.h[0].slice(),d.h[1].slice()],side:d.side};postMessage({id:d.id,m:think(p,d.level)});};';
+  const src=document.getElementById('engine').textContent+'\n'+document.getElementById('oni').textContent+
+    '\nonmessage=function(e){var d=e.data,p={b:Int8Array.from(d.b),h:[d.h[0].slice(),d.h[1].slice()],side:d.side};postMessage({id:d.id,m:thinkAny(p,d.level)});};';
   worker=new Worker(URL.createObjectURL(new Blob([src],{type:'text/javascript'})));
   worker.onmessage=e=>{const cb=workerCb[e.data.id];delete workerCb[e.data.id];if(cb)cb(e.data.m);};
   worker.onerror=()=>{worker=null;const cbs=workerCb;workerCb={};Object.values(cbs).forEach(f=>f(undefined));};
@@ -309,7 +615,7 @@ try{
 let jobId=0;
 function runThink(level,cb){
   const job={id:++jobId,b:Array.from(S.p.b),h:[S.p.h[0].slice(),S.p.h[1].slice()],side:S.p.side,level};
-  const sync=()=>setTimeout(()=>{const p={b:Int8Array.from(job.b),h:job.h,side:job.side};cb(think(p,level));},40);
+  const sync=()=>setTimeout(()=>{const p={b:Int8Array.from(job.b),h:job.h,side:job.side};cb(thinkAny(p,level));},40);
   if(worker){workerCb[job.id]=m=>{if(m===undefined)sync();else cb(m);};worker.postMessage(job);}
   else sync();}
 
@@ -372,7 +678,7 @@ function newGame(){token++;ui={sel:null,targets:[],view:null,hint:null,pending:n
 function askHint(){
   if(ui.thinking||ui.hinting||S.over||S.p.side!==0)return;
   ui.hinting=true;const my=token;render();
-  runThink(3,m=>{ui.hinting=false;if(my!==token)return;
+  runThink(4,m=>{ui.hinting=false;if(my!==token)return;
     if(!m){render();return;}
     ui.hint=m;ui.sel=null;ui.targets=[];
     const what=m.f<0?'もちごまの '+NM[m.d]+' を '+sq(m.t)+' に うつ':NM[Math.abs(S.p.b[m.f])]+' を '+sq(m.t)+' へ うごかす'+(m.p?'（なる）':'');
@@ -456,13 +762,14 @@ function render(){
   renderBoard();renderHand(0);renderHand(1);renderGuide();
   const turn=$('turn');
   if(S.over)turn.innerHTML=S.over==='win'?'★ あなたの かち！':'CPUの かち';
-  else if(ui.thinking)turn.innerHTML='CPUが かんがえちゅう<span class="blink">…</span>';
+  else if(ui.thinking)turn.innerHTML=(S.level===3?'おにが しんけんに かんがえちゅう':'CPUが かんがえちゅう')+'<span class="blink">…</span>';
   else turn.innerHTML='<span class="blink">▶</span> あなたの ばん';
   let m=S.msg;
   if(!m)m=S.p.side===0&&!S.history.length?'あなたの さきてです。うごかしたい こまを タップしてね。':'うごかしたい こまを タップしてね。';
   if(ui.hinting)m='ヒントを かんがえちゅう…';
   $('msg').innerHTML=m;
-  for(let l=0;l<3;l++)$('lv'+l).setAttribute('aria-pressed',S.level===l?'true':'false');
+  for(let l=0;l<4;l++)$('lv'+l).setAttribute('aria-pressed',S.level===l?'true':'false');
+  $('lvnote').textContent=LVNOTE[S.level]||'';
   $('undoBtn').style.opacity=(ui.thinking||!S.history.length)?.5:1;
   $('hintBtn').style.opacity=(ui.thinking||S.over)?.5:1;
   const nb=$('newBtn');nb.textContent=ui.confirmNew?'もういちど おすと はじめから':'↺ はじめから';nb.classList.toggle('warn',ui.confirmNew);
