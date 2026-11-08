@@ -2,11 +2,15 @@
 
 ブラウザですぐ遊べる、ファミコン風ドット絵のミニゲーム集です。インストール不要、HTMLファイル1枚で動きます。
 
-| ゲーム | ファイル | 内容 |
+トップページ（[`index.html`](index.html)）がゲーム一覧で、そこから全部のゲームに行けます。各ゲームの「◀ いちらん」で一覧に戻ります。
+
+| ゲーム | フォルダ | 内容 |
 | --- | --- | --- |
-| ドット将棋 | [`index.html`](index.html) | ドット絵の将棋 |
-| ねこのさかなつり | [`cat-fish/index.html`](cat-fish/index.html) | ネコが魚を釣り上げる90秒スコアアタック |
-| にくきゅうゲーム | [`nikukyu/index.html`](nikukyu/index.html) | タップした所に肉球が残る、スマホ向けミニゲーム3本 |
+| ドット将棋 | [`shogi/`](shogi/index.html) | ドット絵の将棋 |
+| ねこのさかなつり | [`cat-fish/`](cat-fish/index.html) | ネコが魚を釣り上げる90秒スコアアタック |
+| ねこパンチ | [`nikukyu/punch/`](nikukyu/punch/index.html) | にくきゅうゲーム（下を参照） |
+| ゆきのおさんぽ | [`nikukyu/sanpo/`](nikukyu/sanpo/index.html) | にくきゅうゲーム（下を参照） |
+| いたずらねこ | [`nikukyu/itazura/`](nikukyu/itazura/index.html) | にくきゅうゲーム（下を参照） |
 
 ## ねこのさかなつり
 
@@ -27,12 +31,12 @@
 
 ## にくきゅうゲーム
 
-スマホ向け。タップしたところに黒い肉球のあとが残ります。メニュー（[`nikukyu/`](nikukyu/index.html)）から3つのゲームを選べます。
+スマホ向け。タップしたところに黒い肉球のあとが残ります。（`nikukyu/` を開くとトップのゲーム一覧に移ります）
 
 | ゲーム | フォルダ | 内容 |
 | --- | --- | --- |
 | ねこパンチ | [`nikukyu/punch/`](nikukyu/punch/index.html) | 30秒で ねずみ（10点）・さかな（30点）をタップ。コンボで点数アップ、きゅうりに触ると −5秒 |
-| ゆきのおさんぽ | [`nikukyu/sanpo/`](nikukyu/sanpo/index.html) | 雪の上を1マスずつ歩く迷路パズル（全5ステージ）。にぼしを全部拾ってこたつへ。同じ道・池・雪だるまは通れない |
+| ゆきのおさんぽ | [`nikukyu/sanpo/`](nikukyu/sanpo/index.html) | 雪の上を1マスずつ歩く迷路パズル（全15ステージ。6〜15は歩数のよゆうが2歩だけの むずかしいステージ）。にぼしを全部拾ってこたつへ。同じ道・池・雪だるまは通れない |
 | いたずらねこ | [`nikukyu/itazura/`](nikukyu/itazura/index.html) | 30秒で白いふとんを肉球だらけに。かいぬしが見ているときにタップすると −4秒 |
 
 - 音あり（右上の ♪ボタンで消せます。3つのゲームで共通）
@@ -43,6 +47,7 @@
 1. GitHub のリポジトリページで **Settings → Pages** を開く
 2. **Source** を「Deploy from a branch」、ブランチを `main`（フォルダは `/ (root)`）にして保存
 3. 数分後に次のURLで遊べるようになります
-   - ドット将棋：`https://<ユーザー名>.github.io/dot-shogi/`
+   - ゲーム一覧（トップ）：`https://<ユーザー名>.github.io/dot-shogi/`
+   - ドット将棋：`https://<ユーザー名>.github.io/dot-shogi/shogi/`
    - ねこのさかなつり：`https://<ユーザー名>.github.io/dot-shogi/cat-fish/`
-   - にくきゅうゲーム：`https://<ユーザー名>.github.io/dot-shogi/nikukyu/`
+   - にくきゅうゲーム：`https://<ユーザー名>.github.io/dot-shogi/nikukyu/punch/` など

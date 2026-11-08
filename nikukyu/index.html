@@ -2,104 +2,14 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>にくきゅうゲーム</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
-<style>
-/* ファミコン調の単一テーマ。ページのどこをタップしても肉球が残る */
-:root{
-  --k:#000000; --w:#FCFCFC; --cream:#FCE0A8; --yellow:#F8B800; --orange:#FCA044; --brown:#503000;
-  --font:'DotGothic16','MS Gothic','Osaka-Mono',monospace;
-  color-scheme:dark;
-}
-*{box-sizing:border-box}
-html,body{margin:0}
-body{background:var(--cream);color:var(--k);font-family:var(--font);min-height:100dvh;
-  padding:24px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px));
-  display:flex;flex-direction:column;align-items:center;gap:18px;
-  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-#paws{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated;z-index:0}
-header,main,footer{position:relative;z-index:1;width:min(100%,440px)}
-header{text-align:center;display:flex;flex-direction:column;gap:6px}
-h1{font-size:clamp(28px,9vw,40px);font-weight:400;margin:0;letter-spacing:.12em;color:var(--k)}
-header p{margin:0;font-size:14px;color:var(--brown)}
-main{display:flex;flex-direction:column;gap:14px}
-.card{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;background:var(--k);color:var(--cream);text-decoration:none;
-  padding:12px 14px;box-shadow:0 4px 0 var(--brown)}
-.card:active{transform:translateY(2px);box-shadow:0 2px 0 var(--brown)}
-.card:focus-visible{outline:3px dashed var(--k);outline-offset:3px}
-.card img{width:64px;height:auto;image-rendering:pixelated}
-.card h2{margin:0;font-size:20px;font-weight:400;color:var(--yellow);letter-spacing:.08em}
-.card p{margin:2px 0 0;font-size:13px;line-height:1.5}
-.card .tag{color:var(--orange)}
-footer{text-align:center;font-size:12px;color:var(--brown)}
-footer a{color:var(--brown)}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ドットゲーム集</title>
+<!-- にくきゅうゲームのメニューは トップのゲーム一覧に まとめた。むかしのリンク用に 自動で うつる -->
+<meta http-equiv="refresh" content="0; url=../">
+<link rel="canonical" href="../">
+<style>body{background:#FCE0A8;color:#000;font-family:'DotGothic16','MS Gothic',monospace;padding:24px 16px;text-align:center}a{color:#503000}</style>
 </head>
 <body>
-<canvas id="paws"></canvas>
-<header>
-  <h1>にくきゅうゲーム</h1>
-  <p>タップした ところに ねこの あしあとが のこる<br>3つの ミニゲーム（どこを タップしても のこるよ）</p>
-</header>
-<main>
-  <a class="card" href="punch/">
-    <img id="i1" alt="">
-    <div><h2>ねこパンチ</h2><p><span class="tag">はんしゃしんけい</span>　30びょうで ねずみと さかなを つかまえろ。きゅうりに さわると たいへん！</p></div>
-  </a>
-  <a class="card" href="sanpo/">
-    <img id="i2" alt="">
-    <div><h2>ゆきのおさんぽ</h2><p><span class="tag">パズル</span>　ゆきの うえに あしあとを つけて、にぼしを ひろいながら こたつへ かえろう。</p></div>
-  </a>
-  <a class="card" href="itazura/">
-    <img id="i3" alt="">
-    <div><h2>いたずらねこ</h2><p><span class="tag">ドキドキ</span>　かいぬしが よそみを してる あいだに、まっしろな ふとんを あしあとだらけに！</p></div>
-  </a>
-</main>
-<footer><a href="../">ドットゲーム集 トップへ</a></footer>
-<script>
-'use strict';
-const PAL = {K:'#000000',w:'#FCFCFC',e:'#BCBCBC',E:'#7C7C7C',p:'#F878F8',s:'#3CBCFC',S:'#0078F8',o:'#FCA044',r:'#D82800',b:'#503000',t:'#AC7C00',G:'#B8F818',c:'#FCE0A8'};
-function sprite(rows, outline = true) {
-  const h = rows.length, w = rows[0].length, pad = outline ? 1 : 0;
-  const c = document.createElement('canvas'); c.width = w + pad * 2; c.height = h + pad * 2;
-  const x = c.getContext('2d');
-  if (outline) { x.fillStyle = '#000'; for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (rows[j][i] !== '.') for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) x.fillRect(i + pad + dx, j + pad + dy, 1, 1); }
-  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const ch = rows[j][i]; if (ch === '.') continue; x.fillStyle = PAL[ch]; x.fillRect(i + pad, j + pad, 1, 1); }
-  return c;
-}
-// アイコン（16x16 の わくに おさめる）
-function icon(spr) { const c = document.createElement('canvas'); c.width = 18; c.height = 18; c.getContext('2d').drawImage(spr, Math.floor((18 - spr.width) / 2), Math.floor((18 - spr.height) / 2)); return c.toDataURL(); }
-document.getElementById('i1').src = icon(sprite(["...........ee..","..........eppe.","....eeeeeeeepe.","..eeeeeeeeeee..",".eeeeeeeeeeKee.","eeeeeeeeeeeeeep","eeeeeeeeeeeeee.",".eeeeeeeeeeee..","..p.p....p.p..."]));
-document.getElementById('i2').src = icon(sprite(["......oo......",".....oGoo.....","....oooooo....","bbbbbbbbbbbbbb","tttttttttttttt",".rrrrrrrrrrrr.",".rroorroorrrr.",".rrrrrrrrrrrr.",".roorroorroor.","rrrrrrrrrrrrrr"]));
-document.getElementById('i3').src = icon(sprite(["o..........o","oo........oo","ooo......ooo","oooooooooooo","oKKooooooKKo","oKwoooooowKo","oooooooooooo","ooooowwooooo","oooowppwoooo",".oooowwoooo.","..oooooooo.."]));
-
-const PAW = ["...KK....KK...","..KKKK..KKKK..","..KKKK..KKKK..","...KK....KK...","KK..........KK","KKK........KKK","KKK..KKKK..KKK",".K..KKKKKK..K.","...KKKKKKKK...","..KKKKKKKKKK..","..KKKKKKKKKK..","..KKKKKKKKKK..","...KKKKKKKK...","....KK..KK...."];
-const paw = sprite(PAW, false);
-const cv = document.getElementById('paws'), ctx = cv.getContext('2d');
-const S = 3; // 1ドット = 3px
-function fit() {
-  const old = document.createElement('canvas'); old.width = cv.width; old.height = cv.height; if (cv.width) old.getContext('2d').drawImage(cv, 0, 0);
-  cv.width = Math.ceil(innerWidth / S); cv.height = Math.ceil(innerHeight / S);
-  ctx.imageSmoothingEnabled = false; if (old.width) ctx.drawImage(old, 0, 0);
-}
-fit(); addEventListener('resize', fit);
-let actx = null;
-function pofu() {
-  try {
-    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-    if (localStorage.getItem('nikukyu-mute') === '1') return;
-  } catch (e) { if (!actx) return; }
-  const a = actx, t = a.currentTime, o = a.createOscillator(), g = a.createGain();
-  o.type = 'sine'; o.frequency.setValueAtTime(190 + Math.random() * 40, t); o.frequency.exponentialRampToValueAtTime(80, t + .09);
-  g.gain.setValueAtTime(.3, t); g.gain.exponentialRampToValueAtTime(.001, t + .09);
-  o.connect(g).connect(a.destination); o.start(t); o.stop(t + .1);
-}
-addEventListener('pointerdown', e => {
-  ctx.globalAlpha = .85;
-  ctx.drawImage(paw, Math.round(e.clientX / S - 7), Math.round(e.clientY / S - 7));
-  pofu();
-});
-</script>
+<p>ゲーム一覧に うつります…　<a href="../">うつらない ときは ここを タップ</a></p>
 </body>
 </html>

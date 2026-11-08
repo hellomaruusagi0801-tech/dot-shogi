@@ -57,7 +57,7 @@ canvas{display:block;width:100%;height:100%;image-rendering:pixelated;touch-acti
 </head>
 <body>
 <div class="top">
-  <a href="../">◀ もどる</a>
+  <a href="../../">◀ いちらん</a>
   <h1>ゆきのおさんぽ</h1>
   <button class="icon" id="mute" type="button">♪ON</button>
 </div>
@@ -199,8 +199,19 @@ const LEVELS = [
   { best: 22, map: ["S.....",".BWWB.",".K..K.",".BWWB.","......","WW..WW",".K..K.",".....G"] },
   { best: 27, map: ["S.W.K.","..W...","K.W.W.","..W.W.","....W.","WWW.WK","K.....","..GWW."] },
   { best: 29, map: ["K....S",".WW.W.",".W..W.",".W.KW.",".W.WW.","......","B.BB..","..K..G"] },
+  // 6〜15：むずかしい ステージ（プログラムで作って、答えの道が すくないものを えらんだ）
+  { best: 26, slack: 2, map: ["....WW",".K.GWW","W..WWW","K.W...","..WK..","..WB..","KW....","...S.."] },
+  { best: 29, slack: 2, map: ["W...KG","W.....","...K..",".W.WB.","...WS.","W..K..","..BB.W","..KK.."] },
+  { best: 28, slack: 2, map: ["...K..",".BWWB.",".K....","..K.K.",".GWWWW","...WWW","...W.S","...K.W"] },
+  { best: 27, slack: 2, map: [".WWB..","BB.K.S","...WWB",".W....","KB..B.","....WK","...G..",".KBWK."] },
+  { best: 31, slack: 2, map: ["....K.",".WGB..",".W.WW.",".W.WBS","...W.K","..K.WW","......",".B...K"] },
+  { best: 27, slack: 2, map: ["KG..B.",".BBBBW","K.....","K...W.","WWWB..",".KWS..","....W.","..K..."] },
+  { best: 28, slack: 2, map: ["W.....","S.KWB.","W.WW..",".K..B.",".W..W.",".B..W.",".W.GWK","......"] },
+  { best: 27, slack: 2, map: [".....S","K....K",".BB..W","B...KB","G..WW.","..WWW.","..KW..",".K.W.."] },
+  { best: 28, slack: 2, map: [".....W","K..W.W","WK....","...WWW","SB...K","..KWB.","B..KG.","......"] },
+  { best: 27, slack: 2, map: ["KK..WW","....W.","WB....","WW..BG","K.B.WB","....WB","...KW.","BWS.WB"] },
 ];
-const SLACK = 4; // 最短より何歩まで あるけるか
+const SLACK = 4; // 最短より何歩まで あるけるか（ステージごとに slack が あれば そちら）
 
 const CAT = sprite([
   "o..........o",
@@ -279,7 +290,7 @@ function visited(x, y) { return path.some(p => p.x === x && p.y === y); }
 function say(t) { $('msg').textContent = t; clearTimeout(msgTimer); if (t) msgTimer = setTimeout(() => $('msg').textContent = '', 2200); }
 
 function startLevel(i) {
-  lv = i; const L = LEVELS[i]; map = L.map; best = L.best; limit = best + SLACK;
+  lv = i; const L = LEVELS[i]; map = L.map; best = L.best; limit = best + (L.slack ?? SLACK);
   items = 0;
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     const c = map[y][x];
