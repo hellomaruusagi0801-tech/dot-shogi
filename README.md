@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | ドット将棋 | [`index.html`](index.html) | ドット絵の将棋 |
 | ねこのさかなつり | [`cat-fish/index.html`](cat-fish/index.html) | ネコが魚を釣り上げる90秒スコアアタック |
+| にくきゅうゲーム | [`nikukyu/index.html`](nikukyu/index.html) | タップした所に肉球が残る、スマホ向けミニゲーム3本 |
 
 ## ねこのさかなつり
 
@@ -24,6 +25,19 @@
 | 金のさかな | 300 | めったに出ない・すばやい |
 | ながぐつ | 0 | 海の底 |
 
+## にくきゅうゲーム
+
+スマホ向け。タップしたところに黒い肉球のあとが残ります。メニュー（[`nikukyu/`](nikukyu/index.html)）から3つのゲームを選べます。
+
+| ゲーム | フォルダ | 内容 |
+| --- | --- | --- |
+| ねこパンチ | [`nikukyu/punch/`](nikukyu/punch/index.html) | 30秒で ねずみ（10点）・さかな（30点）をタップ。コンボで点数アップ、きゅうりに触ると −5秒 |
+| ゆきのおさんぽ | [`nikukyu/sanpo/`](nikukyu/sanpo/index.html) | 雪の上を1マスずつ歩く迷路パズル（全5ステージ）。にぼしを全部拾ってこたつへ。同じ道・池・雪だるまは通れない |
+| いたずらねこ | [`nikukyu/itazura/`](nikukyu/itazura/index.html) | 30秒で白いふとんを肉球だらけに。かいぬしが見ているときにタップすると −4秒 |
+
+- 音あり（右上の ♪ボタンで消せます。3つのゲームで共通）
+- ハイスコア・クリア状況はブラウザに保存されます
+
 ## GitHub Pages で公開する
 
 1. GitHub のリポジトリページで **Settings → Pages** を開く
@@ -31,3 +45,4 @@
 3. 数分後に次のURLで遊べるようになります
    - ドット将棋：`https://<ユーザー名>.github.io/dot-shogi/`
    - ねこのさかなつり：`https://<ユーザー名>.github.io/dot-shogi/cat-fish/`
+   - にくきゅうゲーム：`https://<ユーザー名>.github.io/dot-shogi/nikukyu/`
