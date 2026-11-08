@@ -41,7 +41,7 @@ h2::after{content:'';flex:1;height:2px;background:var(--brown)}
 <canvas id="paws"></canvas>
 <header>
   <h1>ドットゲーム集</h1>
-  <p>ブラウザで すぐ あそべる ファミコンふう ミニゲーム</p>
+  <p>ブラウザで すぐ あそべる ミニゲームあつめ</p>
 </header>
 <main>
   <section>
@@ -70,6 +70,17 @@ h2::after{content:'';flex:1;height:2px;background:var(--brown)}
       <div><h3>いたずらねこ</h3><p><span class="tag">ドキドキ</span>　かいぬしが よそみを してる あいだに、ふとんを あしあとだらけに！</p></div>
     </a>
   </section>
+  <section>
+    <h2>ほかの ねこゲーム</h2>
+    <a class="card" href="https://hellomaruusagi0801-tech.github.io/nyanko-jump/">
+      <img id="iJump" alt="">
+      <div><h3>にゃんこジャンプ</h3><p><span class="tag">アクション</span>　かわから はねる さかなを、ねこが ジャンプで キャッチ。60びょうで なんてん とれるかな？</p></div>
+    </a>
+    <a class="card" href="https://hellomaruusagi0801-tech.github.io/otsukimi-neko-dango/">
+      <img id="iDango" alt="">
+      <div><h3>お月見ねこだんご</h3><p><span class="tag">3D・つみあげ</span>　十五夜の えんがわで、まんまるの ねこたちを さんぼうの うえに つみあげよう。</p></div>
+    </a>
+  </section>
 </main>
 <script>
 'use strict';
@@ -89,6 +100,8 @@ set('iFish', ["....ssss......","..ssssssss..ss",".sKssssssssss.","ssssssSsssss..
 set('iPunch', ["...........ee..","..........eppe.","....eeeeeeeepe.","..eeeeeeeeeee..",".eeeeeeeeeeKee.","eeeeeeeeeeeeeep","eeeeeeeeeeeeee.",".eeeeeeeeeeee..","..p.p....p.p..."]);
 set('iSanpo', ["......oo......",".....oGoo.....","....oooooo....","bbbbbbbbbbbbbb","tttttttttttttt",".rrrrrrrrrrrr.",".rroorroorrrr.",".rrrrrrrrrrrr.",".roorroorroor.","rrrrrrrrrrrrrr"]);
 set('iItazura', ["o..........o","oo........oo","ooo......ooo","oooooooooooo","oKKooooooKKo","oKwoooooowKo","oooooooooooo","ooooowwooooo","oooowppwoooo",".oooowwoooo.","..oooooooo.."]);
+set('iJump', ["....eeee......","..eeeeeeee..ee",".eKeeeeeeeeee.","eeeeeeEeeeee..",".eeeeeeeeeeee.","..eeeeeeee..ee","....eeee......","..............","ss..ss..ss..ss","ssssssssssssss"]);
+set('iDango', ["..w......w..","..ww....ww..",".wwwwwwwwww.","wwwwwwwwwwww","wwKwwwwwwKww","wwwwwppwwwww","wwwwwwwwwwww",".wwwwwwwwww.","..wwwwwwww..","tttttttttttt",".b.bbbbbb.b.",".bbbbbbbbbb."]);
 
 // どこを タップしても 肉球が のこる
 const paw = sprite(["...KK....KK...","..KKKK..KKKK..","..KKKK..KKKK..","...KK....KK...","KK..........KK","KKK........KKK","KKK..KKKK..KKK",".K..KKKKKK..K.","...KKKKKKKK...","..KKKKKKKKKK..","..KKKKKKKKKK..","..KKKKKKKKKK..","...KKKKKKKK...","....KK..KK...."], false);
