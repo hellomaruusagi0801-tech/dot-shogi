@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>まよいどめ ツールばこ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
+<style>
+/* まよったときに きめる ツール集。ゲーム一覧と おなじ ファミコン調 */
+:root{
+  --k:#000000; --w:#FCFCFC; --cream:#FCE0A8; --yellow:#F8B800; --orange:#FCA044; --brown:#503000;
+  --sky:#3CBCFC; --pink:#F878F8; --green:#B8F818; --red:#D82800;
+  --font:'DotGothic16','MS Gothic','Osaka-Mono',monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--cream);color:var(--k);font-family:var(--font);min-height:100dvh;
+  padding:16px max(16px,env(safe-area-inset-right,0px)) 32px max(16px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;align-items:center;gap:16px;
+  -webkit-tap-highlight-color:transparent}
+header,main{width:min(100%,460px)}
+.topbar{display:flex;justify-content:space-between;align-items:center}
+.topbar a,.topbar button{font:inherit;font-size:14px;color:var(--brown);text-decoration:none;background:none;border:0;padding:4px 0;cursor:pointer}
+h1{font-size:clamp(26px,8vw,36px);font-weight:400;margin:6px 0 0;text-align:center;letter-spacing:.1em}
+header p{margin:4px 0 0;font-size:13px;color:var(--brown);text-align:center}
+main{display:flex;flex-direction:column;gap:16px}
+button{font-family:var(--font)}
+.box{background:var(--k);color:var(--cream);padding:12px 14px;box-shadow:0 4px 0 var(--brown)}
+.box h2{margin:0 0 8px;font-size:15px;font-weight:400;color:var(--yellow);letter-spacing:.06em}
+/* せんたくし */
+.add{display:flex;gap:8px}
+.add input{flex:1;min-width:0;font:inherit;font-size:16px;padding:8px;border:0;background:var(--w);color:var(--k)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--cream);color:var(--k);padding:4px 4px 4px 8px;font-size:14px}
+.chip button{border:0;background:var(--brown);color:var(--cream);width:22px;height:22px;font-size:13px;cursor:pointer;padding:0}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:12px;color:var(--orange);align-items:center}
+.presets button{border:2px solid var(--orange);background:none;color:var(--orange);font-size:12px;padding:2px 6px;cursor:pointer}
+/* ボタン */
+.btn{border:0;background:var(--yellow);color:var(--k);font-size:18px;padding:10px 18px;cursor:pointer;box-shadow:0 4px 0 var(--brown);letter-spacing:.08em}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 var(--brown)}
+.btn.sub{background:var(--cream);font-size:14px;padding:6px 12px}
+.btn:disabled{opacity:.5}
+/* タブ */
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tab{border:0;background:var(--w);color:var(--k);padding:8px 2px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;box-shadow:0 3px 0 var(--brown);white-space:nowrap}
+.tab img{width:32px;image-rendering:pixelated}
+.tab[aria-selected="true"]{background:var(--k);color:var(--yellow)}
+/* ツール画面 */
+.panel{display:none;flex-direction:column;align-items:center;gap:14px;background:var(--w);padding:16px 12px;box-shadow:0 4px 0 var(--brown);border:3px solid var(--k)}
+.panel.on{display:flex}
+.panel canvas{width:100%;image-rendering:pixelated;touch-action:manipulation}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center}
+.note{font-size:13px;color:var(--brown);margin:0;text-align:center}
+.result{min-height:52px;width:100%;background:var(--k);color:var(--yellow);font-size:24px;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px;letter-spacing:.06em}
+.result.pop{animation:pop .35s steps(4)}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.seg{display:inline-flex;border:3px solid var(--k)}
+.seg button{border:0;background:var(--w);font-size:15px;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--k);color:var(--yellow)}
+/* サイコロ */
+.dice{display:flex;gap:14px;justify-content:center;min-height:96px;align-items:center}
+.die{width:84px;height:84px;background:var(--w);border:4px solid var(--k);box-shadow:4px 4px 0 var(--brown);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:8px}
+.die i{width:14px;height:14px;background:var(--k);place-self:center;visibility:hidden}
+.die i.on{visibility:visible}
+.die.one i.on{background:var(--red);width:20px;height:20px}
+.die.roll{animation:shake .1s steps(2) infinite}
+@keyframes shake{0%{transform:translate(-3px,2px) rotate(-6deg)}100%{transform:translate(3px,-2px) rotate(6deg)}}
+/* コイン */
+.coin{width:150px;height:150px;border-radius:50%;background:var(--yellow);border:6px solid var(--k);box-shadow:inset -8px -8px 0 var(--orange),6px 6px 0 var(--brown);
+  display:flex;align-items:center;justify-content:center;font-size:30px;letter-spacing:.06em}
+.coin.ura{background:#BCBCBC;box-shadow:inset -8px -8px 0 #7C7C7C,6px 6px 0 var(--brown)}
+.coin.flip{animation:flip .16s steps(4) infinite}
+@keyframes flip{0%{transform:scaleY(1)}50%{transform:scaleY(.08)}100%{transform:scaleY(1)}}
+/* じゅんばん・チーム */
+ol.order{margin:0;padding:0;list-style:none;width:100%;display:flex;flex-direction:column;gap:6px}
+ol.order li{background:var(--cream);padding:8px 12px;font-size:18px;display:flex;gap:12px;animation:pop .3s steps(3)}
+ol.order li b{font-weight:400;color:var(--red);min-width:2.5em}
+.teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;width:100%}
+.team{border:3px solid var(--k);padding:8px;animation:pop .3s steps(3)}
+.team h3{margin:0 0 6px;font-size:16px;font-weight:400}
+.team div{font-size:16px;line-height:1.6}
+/* あみだの なまえ */
+details.names{width:100%;border:3px solid var(--k);padding:6px 10px}
+details.names summary{cursor:pointer;font-size:15px}
+.nameRow{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:15px}
+.nameRow span{min-width:1.6em;text-align:right}
+.nameRow input,.panel .add input{flex:1;min-width:0;font:inherit;font-size:16px;padding:6px 8px;border:3px solid var(--k);background:var(--w)}
+/* おみくじ */
+.kujiEdit{width:100%;display:flex;flex-direction:column;gap:8px}
+.kujiEdit .chips{margin-top:0}
+.kujiEdit .chip{border:2px solid var(--k)}
+.kujiEdit .presets{margin-top:0;color:var(--brown)}
+.kujiEdit .presets button{border-color:var(--brown);color:var(--brown)}
+.kujiEdit.locked form,.kujiEdit.locked .presets,.kujiEdit.locked .chips{display:none}
+.kujiBox{width:96px}
+.kujiBox img{width:100%;image-rendering:pixelated;display:block}
+.kujiBox.shake{animation:shake .1s steps(2) infinite}
+.slip{background:var(--w);border:4px solid var(--red);box-shadow:5px 5px 0 var(--brown);padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;animation:pop .35s steps(4)}
+.slip[hidden]{display:none}
+.slip small{font-size:14px;color:var(--brown)}
+.slip b{font-weight:400;font-size:40px;writing-mode:vertical-rl;letter-spacing:.15em;color:var(--red);min-height:2em}
+.linkish{border:0;background:none;color:var(--brown);font-size:13px;text-decoration:underline;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar"><a href="../">◀ いちらん</a><button id="sound" type="button">♪ おと：オン</button></div>
+  <h1>まよいどめ<br>ツールばこ</h1>
+  <p>きめられない ときは、まかせて みよう</p>
+</header>
+<main>
+  <section class="box">
+    <h2>せんたくし（ルーレット・あみだ・じゅんばん・チームで つかう）</h2>
+    <form class="add" id="addForm"><input id="addIn" maxlength="12" placeholder="たとえば：カレー" autocomplete="off"><button class="btn sub" type="submit">ついか</button></form>
+    <div class="chips" id="chips"></div>
+    <div class="presets">れい：<button data-p="ごはん">ごはん</button><button data-p="あそび">あそび</button><button data-p="かず">1〜6</button><button data-p="clear">ぜんぶ けす</button></div>
+  </section>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+
+  <!-- ルーレット -->
+  <section class="panel" id="p-roulette">
+    <canvas id="wheel" width="300" height="300"></canvas>
+    <button class="btn" id="spin">まわす！</button>
+    <div class="result" id="r-roulette">？</div>
+  </section>
+
+  <!-- あみだくじ -->
+  <section class="panel" id="p-amida">
+    <details class="names"><summary>うえの なまえを きめる（なしでも OK）</summary><div id="amidaNames"></div></details>
+    <p class="note">うえの ばんごう（なまえ）を タップすると スタート</p>
+    <canvas id="amida" width="300" height="340"></canvas>
+    <div class="row"><button class="btn sub" id="amidaNew">あみだを つくりなおす</button><button class="btn sub" id="amidaAll">ぜんぶ ひらく</button></div>
+    <div class="result" id="r-amida">？</div>
+  </section>
+
+  <!-- おみくじ -->
+  <section class="panel" id="p-omikuji">
+    <div class="kujiEdit" id="kujiEdit">
+      <p class="note" id="kujiNote">くじの なかみを いれてね（1こ ＝ 1にんぶん）</p>
+      <form class="add" id="kujiForm"><input id="kujiIn" maxlength="10" placeholder="たとえば：大吉" autocomplete="off"><button class="btn sub" type="submit">ついか</button></form>
+      <div class="chips" id="kujiChips"></div>
+      <div class="presets">れい：<button type="button" data-k="unsei">うんせい</button><button type="button" data-k="atari">あたり 1こ</button><button type="button" data-k="clear">ぜんぶ けす</button></div>
+    </div>
+    <div class="kujiBox" id="kujiBox"><img id="kujiImg" alt="おみくじの はこ"></div>
+    <p class="note" id="kujiLeft"></p>
+    <button class="btn" id="draw">ひく！</button>
+    <div class="slip" id="slip" hidden><small id="slipWho"></small><b id="slipText"></b></div>
+    <ol class="order" id="kujiLog"></ol>
+    <button class="btn" id="kujiAgain" hidden>もういちど あそぶ</button>
+    <button class="linkish" id="kujiAbort" type="button" hidden>とちゅうで やりなおす</button>
+    <div class="row" id="kujiAsk" hidden><span class="note">ほんとうに さいしょから やりなおす？</span><button class="btn sub" id="kujiYes" type="button">はい</button><button class="btn sub" id="kujiNo" type="button">いいえ</button></div>
+  </section>
+
+  <!-- サイコロ -->
+  <section class="panel" id="p-dice">
+    <div class="seg" id="diceN"><button aria-pressed="true" data-n="1">1こ</button><button aria-pressed="false" data-n="2">2こ</button><button aria-pressed="false" data-n="3">3こ</button></div>
+    <div class="dice" id="dice"></div>
+    <button class="btn" id="roll">ふる！</button>
+    <div class="result" id="r-dice">？</div>
+  </section>
+
+  <!-- コイン -->
+  <section class="panel" id="p-coin">
+    <div class="coin" id="coin">？</div>
+    <button class="btn" id="toss">なげる！</button>
+    <div class="result" id="r-coin">？</div>
+  </section>
+
+  <!-- じゅんばん -->
+  <section class="panel" id="p-order">
+    <p class="note">せんたくしを ランダムな じゅんばんに ならべるよ</p>
+    <button class="btn" id="shuffle">ならべる！</button>
+    <ol class="order" id="order"></ol>
+  </section>
+
+  <!-- チームわけ -->
+  <section class="panel" id="p-team">
+    <div class="seg" id="teamN"><button aria-pressed="true" data-n="2">2チーム</button><button aria-pressed="false" data-n="3">3チーム</button><button aria-pressed="false" data-n="4">4チーム</button></div>
+    <button class="btn" id="split">わける！</button>
+    <div class="teams" id="teams"></div>
+  </section>
+</main>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random() * n);
+const shuffled = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const FONT = "'DotGothic16','MS Gothic',monospace";
+const COLORS = ['#F8B800', '#3CBCFC', '#F878F8', '#B8F818', '#FCA044', '#FCFCFC', '#BCBCBC', '#FCE0A8'];
+
+/* ---------- ドット絵アイコン ---------- */
+const PAL = {K:'#000000',w:'#FCFCFC',e:'#BCBCBC',y:'#F8B800',o:'#FCA044',r:'#D82800',s:'#3CBCFC',p:'#F878F8',G:'#B8F818',b:'#503000',c:'#FCE0A8'};
+function sprite(rows) {
+  const h = rows.length, w = rows[0].length, c = document.createElement('canvas'); c.width = w + 2; c.height = h + 2;
+  const x = c.getContext('2d');
+  x.fillStyle = '#000';
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (rows[j][i] !== '.') for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) x.fillRect(i + 1 + dx, j + 1 + dy, 1, 1);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const ch = rows[j][i]; if (ch === '.') continue; x.fillStyle = PAL[ch]; x.fillRect(i + 1, j + 1, 1, 1); }
+  return c.toDataURL();
+}
+const TOOLS = [
+  ['roulette', 'ルーレット', ["....KK....","..yyKKss..",".yyyKKsss.",".yyyKKsss.","KKKKKKKKKK","KKKKKKKKKK",".pppKKGGG.",".pppKKGGG.","..ppKKGG..","....KK...."]],
+  ['amida', 'あみだ', ["w..w..w..w","w..w..w..w","wwww..w..w","w..w..w..w","w..wwww..w","w..w..w..w","w..w..wwww","w..w..w..w","r..w..w..w","r..w..w..w"]],
+  ['omikuji', 'おみくじ', ["....ww....","....ww....","..rrrrrr..",".rrrrrrrr.",".rryyyyrr.",".rryrryrr.",".rryyyyrr.",".rryrryrr.",".rrrrrrrr.","..rrrrrr.."]],
+  ['dice', 'サイコロ', ["wwwwwwwwww","wKKwwwwwww","wKKwwwwwww","wwwwwwwwww","wwwwKKwwww","wwwwKKwwww","wwwwwwwwww","wwwwwwwKKw","wwwwwwwKKw","wwwwwwwwww"]],
+  ['coin', 'コイン', ["...yyyy...",".yyyyyyyy.",".yyoooyyy.","yyoyyyyyyo","yyoyyyyyyo","yyoyyyyyyo","yyyyyyyyyo",".yyyyyyoo.",".yyyyoooo.","...oooo..."]],
+  ['order', 'じゅんばん', ["..yy......",".yyy.wwwww","..yy......","..........","..ee......",".e..ewwwww","...e......","..eee.....","..........",".oo..wwwww"]],
+  ['team', 'チームわけ', ["..rr..ss..",".rrrrssss.",".rrrrssss.","..rr..ss..",".rrrrssss.","rrrrrsssss","rrrrrsssss","rrrrrsssss",".rr....ss.",".rr....ss."]],
+];
+
+/* ---------- おと ---------- */
+let actx = null, muted = false;
+try { muted = localStorage.getItem('mayoi-mute') === '1'; } catch (e) {}
+function beep(f, d = .06, type = 'square', vol = .12, at = 0) {
+  if (muted) return;
+  try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  const t = actx.currentTime + at, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d + .02);
+}
+const tick = () => beep(880, .03);
+const fanfare = () => [523, 659, 784, 1047].forEach((f, i) => beep(f, .12, 'square', .1, i * .09));
+function setSoundLabel() { $('sound').textContent = muted ? '♪ おと：オフ' : '♪ おと：オン'; }
+$('sound').onclick = () => { muted = !muted; try { localStorage.setItem('mayoi-mute', muted ? '1' : '0'); } catch (e) {} setSoundLabel(); };
+setSoundLabel();
+
+function show(id, text) { const r = $(id); r.textContent = text; r.classList.remove('pop'); void r.offsetWidth; r.classList.add('pop'); fanfare(); }
+
+/* ---------- せんたくし ---------- */
+const PRESETS = { 'ごはん': ['カレー', 'ラーメン', 'おすし', 'ハンバーグ', 'うどん'], 'あそび': ['こうえん', 'ゲーム', 'おえかき', 'ほん', 'おさんぽ'], 'かず': ['1', '2', '3', '4', '5', '6'] };
+let choices = PRESETS['ごはん'].slice();
+try { const s = JSON.parse(localStorage.getItem('mayoi-choices')); if (Array.isArray(s)) choices = s.filter(x => typeof x === 'string').slice(0, 12); } catch (e) {}
+function save() { try { localStorage.setItem('mayoi-choices', JSON.stringify(choices)); } catch (e) {} }
+function chipList(el, arr, onRemove, color) {
+  el.innerHTML = '';
+  if (!arr.length) { el.innerHTML = `<span style="font-size:13px;color:${color}">まだ なにも ないよ。うえに かいて ついか してね</span>`; }
+  arr.forEach((c, i) => {
+    const s = document.createElement('span'); s.className = 'chip'; s.textContent = c;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = '×'; b.setAttribute('aria-label', c + ' を けす');
+    b.onclick = () => onRemove(i);
+    s.append(b); el.append(s);
+  });
+}
+function renderChips() { chipList($('chips'), choices, i => { choices.splice(i, 1); changed(); }, '#FCA044'); }
+function changed() { save(); renderChips(); drawWheel(); newAmida(); }
+$('addForm').onsubmit = e => {
+  e.preventDefault(); const v = $('addIn').value.trim();
+  if (!v) return;
+  if (choices.length >= 12) { $('addIn').value = ''; $('addIn').placeholder = 'いっぱい（12こまで）'; return; }
+  choices.push(v); $('addIn').value = ''; changed();
+};
+document.querySelectorAll('.presets button').forEach(b => b.onclick = () => { const p = b.dataset.p; choices = p === 'clear' ? [] : PRESETS[p].slice(); changed(); });
+const need = (n, id) => { if (choices.length < n) { const r = $(id); if (r) { r.textContent = `せんたくしを ${n}こ いじょう いれてね`; } return false; } return true; };
+
+/* ---------- タブ ---------- */
+let current = 'roulette';
+try { current = localStorage.getItem('mayoi-tab') || 'roulette'; } catch (e) {}
+TOOLS.forEach(([id, name, rows]) => {
+  const b = document.createElement('button'); b.className = 'tab'; b.type = 'button'; b.role = 'tab'; b.dataset.id = id;
+  const img = document.createElement('img'); img.src = sprite(rows); img.alt = '';
+  b.append(img, name); b.onclick = () => select(id); $('tabs').append(b);
+});
+function select(id) {
+  if (!TOOLS.some(t => t[0] === id)) id = 'roulette';
+  current = id; try { localStorage.setItem('mayoi-tab', id); } catch (e) {}
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.id === id));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + id));
+}
+
+/* ---------- キャンバスの じゅんび ---------- */
+function prep(cv, h) {
+  const w = cv.clientWidth || 300, dpr = Math.min(devicePixelRatio || 1, 3);
+  cv.style.height = h(w) + 'px'; cv.width = w * dpr; cv.height = h(w) * dpr;
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); return [x, w, h(w)];
+}
+const clip = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+/* ---------- ルーレット ---------- */
+let rot = 0, spinning = false;
+function drawWheel() {
+  const cv = $('wheel'); if (!cv.clientWidth) return;
+  const [x, w] = prep(cv, w => Math.min(w, 340));
+  const W = cv.clientWidth, H = Math.min(W, 340), cx = W / 2, cy = H / 2 + 8, R = Math.min(W, H) / 2 - 18;
+  x.clearRect(0, 0, W, H);
+  const n = Math.max(choices.length, 1), seg = Math.PI * 2 / n;
+  x.fillStyle = '#503000'; x.beginPath(); x.arc(cx + 5, cy + 5, R + 6, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#000'; x.beginPath(); x.arc(cx, cy, R + 6, 0, Math.PI * 2); x.fill();
+  for (let i = 0; i < n; i++) {
+    x.fillStyle = choices.length ? COLORS[i % COLORS.length] : '#BCBCBC';
+    if (n > 1 && i === n - 1 && n % COLORS.length === 1) x.fillStyle = COLORS[2];
+    x.beginPath(); x.moveTo(cx, cy); x.arc(cx, cy, R, rot + i * seg, rot + (i + 1) * seg); x.closePath(); x.fill();
+    x.strokeStyle = '#000'; x.lineWidth = 3; x.stroke();
+    if (!choices.length) continue;
+    x.save(); x.translate(cx, cy); x.rotate(rot + (i + .5) * seg);
+    x.fillStyle = '#000'; x.font = `${n > 8 ? 13 : 16}px ${FONT}`; x.textAlign = 'right'; x.textBaseline = 'middle';
+    x.fillText(clip(choices[i], 6), R - 12, 0); x.restore();
+  }
+  x.fillStyle = '#000'; x.beginPath(); x.arc(cx, cy, 16, 0, Math.PI * 2); x.fill();
+  x.fillStyle = '#F8B800'; x.beginPath(); x.arc(cx, cy, 9, 0, Math.PI * 2); x.fill();
+  // はり（うえ）
+  x.fillStyle = '#D82800'; x.strokeStyle = '#000'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(cx - 13, cy - R - 16); x.lineTo(cx + 13, cy - R - 16); x.lineTo(cx, cy - R + 10); x.closePath(); x.fill(); x.stroke();
+}
+const pickIndex = () => { const n = choices.length, seg = Math.PI * 2 / n; let a = (-Math.PI / 2 - rot) % (Math.PI * 2); if (a < 0) a += Math.PI * 2; return Math.floor(a / seg) % n; };
+$('spin').onclick = () => {
+  if (spinning || !need(2, 'r-roulette')) return;
+  spinning = true; $('spin').disabled = true; $('r-roulette').textContent = '…';
+  const start = rot, dist = Math.PI * 2 * (5 + Math.random() * 2) + Math.random() * Math.PI * 2, T = 3600, t0 = performance.now();
+  let last = pickIndex();
+  (function f(now) {
+    const p = Math.min((now - t0) / T, 1), e = 1 - Math.pow(1 - p, 4);
+    rot = start + dist * e; drawWheel();
+    const k = pickIndex(); if (k !== last) { tick(); last = k; }
+    if (p < 1) requestAnimationFrame(f);
+    else { rot %= Math.PI * 2; spinning = false; $('spin').disabled = false; show('r-roulette', '「' + choices[pickIndex()] + '」に きまり！'); }
+  })(t0);
+};
+
+/* ---------- あみだくじ ---------- */
+const ROWS = 9;
+let amida = null, tracing = false, amidaNames = [];
+try { const s = JSON.parse(localStorage.getItem('mayoi-amida-names')); if (Array.isArray(s)) amidaNames = s.map(x => typeof x === 'string' ? x : ''); } catch (e) {}
+const topLabel = i => (amidaNames[i] || '').trim() || String(i + 1);
+function renderNames() {
+  const el = $('amidaNames'); el.innerHTML = '';
+  for (let i = 0; i < choices.length; i++) {
+    const row = document.createElement('label'); row.className = 'nameRow';
+    const n = document.createElement('span'); n.textContent = (i + 1) + '：';
+    const inp = document.createElement('input'); inp.maxLength = 8; inp.placeholder = String(i + 1); inp.value = amidaNames[i] || ''; inp.autocomplete = 'off';
+    inp.oninput = () => { amidaNames[i] = inp.value; try { localStorage.setItem('mayoi-amida-names', JSON.stringify(amidaNames)); } catch (e) {} if (!tracing) drawAmida(); };
+    row.append(n, inp); el.append(row);
+  }
+  if (!choices.length) el.innerHTML = '<p class="note">さきに せんたくしを いれてね</p>';
+}
+function newAmida() {
+  renderNames();
+  const n = choices.length, rungs = [];
+  for (let r = 0; r < ROWS; r++) { const row = []; for (let i = 0; i < n - 1; i++) row.push(!row[i - 1] && Math.random() < .45); rungs.push(row); }
+  // どの たてせんの あいだにも 1ぽんは よこせんを
+  for (let i = 0; i < n - 1; i++) if (!rungs.some(row => row[i])) { const r = rnd(ROWS); rungs[r][i] = true; if (i > 0) rungs[r][i - 1] = false; if (i < n - 2) rungs[r][i + 1] = false; }
+  amida = { n, rungs, bottom: shuffled(choices), open: new Array(n).fill(false), used: new Array(n).fill(false), paths: [] };
+  $('r-amida').textContent = '？'; drawAmida();
+}
+function amidaGeo() {
+  const W = $('amida').clientWidth || 300, H = Math.round(W * 1.1), n = amida.n, m = Math.min(36, W / (n * 2));
+  const xs = Array.from({ length: n }, (_, i) => n === 1 ? W / 2 : m + i * (W - 2 * m) / (n - 1));
+  return { W, H, xs, y0: 44, y1: H - 50, dy: (H - 94) / ROWS, bw: Math.min(64, W / n - 4) };
+}
+function pathFor(c) {
+  const g = amidaGeo(), pts = [[g.xs[c], 18], [g.xs[c], g.y0]];
+  for (let r = 0; r < ROWS; r++) {
+    const y = g.y0 + (r + .5) * g.dy;
+    if (amida.rungs[r][c]) { pts.push([g.xs[c], y], [g.xs[c + 1], y]); c++; }
+    else if (c > 0 && amida.rungs[r][c - 1]) { pts.push([g.xs[c], y], [g.xs[c - 1], y]); c--; }
+  }
+  pts.push([g.xs[c], g.y1]); return { pts, end: c };
+}
+function drawAmida(anim) {
+  const cv = $('amida'); if (!cv.clientWidth || !amida) return;
+  const g = amidaGeo(); const [x] = prep(cv, w => Math.round(w * 1.1));
+  x.clearRect(0, 0, g.W, g.H);
+  if (amida.n < 2) { x.fillStyle = '#503000'; x.font = `15px ${FONT}`; x.textAlign = 'center'; x.fillText('せんたくしを 2こ いじょう いれてね', g.W / 2, g.H / 2); return; }
+  x.strokeStyle = '#000'; x.lineWidth = 4; x.lineCap = 'square';
+  g.xs.forEach(px => { x.beginPath(); x.moveTo(px, g.y0); x.lineTo(px, g.y1); x.stroke(); });
+  amida.rungs.forEach((row, r) => row.forEach((on, i) => { if (!on) return; const y = g.y0 + (r + .5) * g.dy; x.beginPath(); x.moveTo(g.xs[i], y); x.lineTo(g.xs[i + 1], y); x.stroke(); }));
+  const drawPath = (pts, len, color) => {
+    x.strokeStyle = color; x.lineWidth = 6; x.beginPath(); x.moveTo(...pts[0]); let left = len;
+    for (let i = 1; i < pts.length && left > 0; i++) {
+      const [ax, ay] = pts[i - 1], [bx, by] = pts[i], d = Math.hypot(bx - ax, by - ay);
+      if (left >= d) x.lineTo(bx, by); else x.lineTo(ax + (bx - ax) * left / d, ay + (by - ay) * left / d);
+      left -= d;
+    }
+    x.stroke();
+  };
+  amida.paths.forEach(p => drawPath(p.pts, Infinity, p.color));
+  if (anim) drawPath(anim.pts, anim.len, anim.color);
+  const fs = amida.n > 6 ? 11 : 14;
+  const bw = g.bw, nc = amida.n > 6 ? 3 : 4;
+  g.xs.forEach((px, i) => {
+    // うえ：ばんごう または なまえ
+    x.fillStyle = amida.used[i] ? '#3CBCFC' : '#F8B800'; x.fillRect(px - bw / 2, 2, bw, 30); x.strokeStyle = '#000'; x.lineWidth = 3; x.strokeRect(px - bw / 2, 2, bw, 30);
+    const named = (amidaNames[i] || '').trim();
+    x.fillStyle = '#000'; x.font = `${named ? fs : 16}px ${FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(clip(topLabel(i), nc), px, 18);
+    // した：こたえ（かくしてある）
+    x.fillStyle = amida.open[i] ? '#FCFCFC' : '#000'; x.fillRect(px - bw / 2, g.y1 + 6, bw, 36);
+    x.strokeStyle = '#000'; x.strokeRect(px - bw / 2, g.y1 + 6, bw, 36);
+    x.fillStyle = amida.open[i] ? '#000' : '#F8B800'; x.font = `${fs}px ${FONT}`;
+    x.fillText(amida.open[i] ? clip(amida.bottom[i], nc) : '？', px, g.y1 + 24);
+  });
+}
+function trace(c, cb) {
+  const { pts, end } = pathFor(c), color = ['#D82800', '#0078F8', '#00A800', '#F878F8', '#FCA044'][amida.paths.length % 5];
+  let total = 0; for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  const t0 = performance.now(), T = 1800; let lastBeep = 0;
+  (function f(now) {
+    const p = Math.min((now - t0) / T, 1);
+    if (now - lastBeep > 90) { beep(440 + p * 440, .03); lastBeep = now; }
+    drawAmida({ pts, len: total * p, color });
+    if (p < 1) requestAnimationFrame(f); else { amida.paths.push({ pts, color }); amida.open[end] = true; drawAmida(); cb(end); }
+  })(t0);
+}
+$('amida').addEventListener('pointerdown', e => {
+  if (tracing || !amida || amida.n < 2) return;
+  const r = $('amida').getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, g = amidaGeo();
+  if (py > 60) return;
+  const c = g.xs.findIndex(x => Math.abs(x - px) <= Math.max(g.bw / 2, 16)); if (c < 0 || amida.used[c]) return;
+  amida.used[c] = true; tracing = true; $('r-amida').textContent = '…';
+  trace(c, end => { tracing = false; const t = topLabel(c); show('r-amida', `${/^\d+$/.test(t) ? t + 'ばん' : t} →「${amida.bottom[end]}」`); });
+});
+$('amidaNew').onclick = () => { if (!tracing) newAmida(); };
+$('amidaAll').onclick = () => { if (tracing || !amida) return; amida.open.fill(true); drawAmida(); };
+
+/* ---------- おみくじ ---------- */
+// くじは ひいたら なくなる。ぜんぶ ひきおわるまで なかみは かえられない（とちゅうで とじても つづきから）
+const KUJI_PRESETS = { unsei: ['大吉', '中吉', '小吉', '吉', '末吉', '凶'], atari: ['あたり', 'はずれ', 'はずれ'] };
+let kuji = ['大吉', '中吉', '吉'], round = null, drawing = false;
+try { const s = JSON.parse(localStorage.getItem('mayoi-kuji')); if (Array.isArray(s)) kuji = s.filter(x => typeof x === 'string').slice(0, 20); } catch (e) {}
+try { const r = JSON.parse(localStorage.getItem('mayoi-kuji-round')); if (r && Array.isArray(r.deck) && Array.isArray(r.log)) round = r; } catch (e) {}
+const saveKuji = () => { try { localStorage.setItem('mayoi-kuji', JSON.stringify(kuji)); localStorage.setItem('mayoi-kuji-round', JSON.stringify(round)); } catch (e) {} };
+$('kujiImg').src = sprite(TOOLS.find(t => t[0] === 'omikuji')[2]);
+function renderKuji() {
+  const active = !!round && round.deck.length > 0, done = !!round && round.deck.length === 0;
+  $('kujiEdit').classList.toggle('locked', !!round);
+  $('kujiNote').textContent = done ? '「もういちど あそぶ」を おすと、くじを いれなおせるよ' : active ? 'ぜんいん ひきおわるまで、くじの なかみは かえられないよ' :'くじの なかみを いれてね（1こ ＝ 1にんぶん）';
+  chipList($('kujiChips'), kuji, i => { kuji.splice(i, 1); saveKuji(); renderKuji(); }, '#503000');
+  $('kujiLeft').textContent = done ? 'ぜんいん ひきおわったよ！' : active ? `のこり ${round.deck.length}まい ・ つぎは ${round.log.length + 1}にんめ` : kuji.length ? `${kuji.length}にんぶん の くじが はいってるよ` : '';
+  $('draw').disabled = drawing || done || (!round && !kuji.length);
+  $('draw').hidden = done;
+  $('kujiAgain').hidden = !done; $('kujiAbort').hidden = !active || drawing || !$('kujiAsk').hidden;
+  if (!active) $('kujiAsk').hidden = true;
+  const ol = $('kujiLog'); ol.innerHTML = '';
+  (round ? round.log : []).forEach((t, i) => { const li = document.createElement('li'); li.style.animation = 'none'; li.innerHTML = `<b>${i + 1}にんめ</b>`; li.append(t); ol.append(li); });
+}
+$('kujiForm').onsubmit = e => {
+  e.preventDefault(); if (round) return; const v = $('kujiIn').value.trim(); if (!v) return;
+  if (kuji.length >= 20) { $('kujiIn').value = ''; $('kujiIn').placeholder = 'いっぱい（20こまで）'; return; }
+  kuji.push(v); $('kujiIn').value = ''; saveKuji(); renderKuji();
+};
+document.querySelectorAll('#kujiEdit .presets button').forEach(b => b.onclick = () => { if (round) return; const k = b.dataset.k; kuji = k === 'clear' ? [] : KUJI_PRESETS[k].slice(); saveKuji(); renderKuji(); });
+$('draw').onclick = () => {
+  if (drawing) return;
+  if (!round) { if (!kuji.length) return; round = { deck: shuffled(kuji), log: [] }; saveKuji(); }
+  if (!round.deck.length) return;
+  drawing = true; $('slip').hidden = true; renderKuji();
+  const box = $('kujiBox'); box.classList.add('shake');
+  const iv = setInterval(() => beep(300 + rnd(200), .04, 'square', .08), 90);
+  setTimeout(() => {
+    clearInterval(iv); box.classList.remove('shake');
+    const t = round.deck.pop(); round.log.push(t); saveKuji(); drawing = false;
+    $('slipWho').textContent = `${round.log.length}にんめ の くじ`; $('slipText').textContent = t;
+    const s = $('slip'); s.hidden = false; s.style.animation = 'none'; void s.offsetWidth; s.style.animation = '';
+    fanfare(); renderKuji();
+  }, 1000);
+};
+$('kujiAgain').onclick = () => { round = null; $('slip').hidden = true; saveKuji(); renderKuji(); };
+$('kujiAbort').onclick = () => { $('kujiAbort').hidden = true; $('kujiAsk').hidden = false; };
+$('kujiNo').onclick = () => { $('kujiAsk').hidden = true; renderKuji(); };
+$('kujiYes').onclick = () => { $('kujiAsk').hidden = true; round = null; $('slip').hidden = true; saveKuji(); renderKuji(); };
+
+/* ---------- サイコロ ---------- */
+const PIPS = { 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+let diceN = 1, rolling = false;
+function face(d, v) { d.classList.toggle('one', v === 1); d.querySelectorAll('i').forEach((p, k) => p.classList.toggle('on', PIPS[v].includes(k))); }
+function makeDice() {
+  $('dice').innerHTML = '';
+  for (let i = 0; i < diceN; i++) { const d = document.createElement('div'); d.className = 'die'; d.innerHTML = '<i></i>'.repeat(9); face(d, i + 1); $('dice').append(d); }
+}
+function segSetup(id, cb) { document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => { document.querySelectorAll(`#${id} button`).forEach(o => o.setAttribute('aria-pressed', o === b)); cb(+b.dataset.n); }); }
+segSetup('diceN', n => { if (rolling) return; diceN = n; makeDice(); $('r-dice').textContent = '？'; });
+$('roll').onclick = () => {
+  if (rolling) return; rolling = true; $('roll').disabled = true; $('r-dice').textContent = '…';
+  const ds = [...document.querySelectorAll('.die')]; ds.forEach(d => d.classList.add('roll'));
+  const iv = setInterval(() => { ds.forEach(d => face(d, rnd(6) + 1)); tick(); }, 70);
+  setTimeout(() => {
+    clearInterval(iv); const vs = ds.map(d => { const v = rnd(6) + 1; face(d, v); d.classList.remove('roll'); return v; });
+    rolling = false; $('roll').disabled = false;
+    show('r-dice', vs.length > 1 ? `${vs.join(' ＋ ')} ＝ ${vs.reduce((a, b) => a + b)}` : `${vs[0]} が でた！`);
+  }, 1100);
+};
+
+/* ---------- コイン ---------- */
+let tossing = false;
+$('toss').onclick = () => {
+  if (tossing) return; tossing = true; $('toss').disabled = true; $('r-coin').textContent = '…';
+  const c = $('coin'); c.classList.add('flip');
+  let k = 0; const iv = setInterval(() => { k++; c.classList.toggle('ura', k % 2 === 1); c.textContent = k % 2 ? 'うら' : 'おもて'; }, 80);
+  setTimeout(() => {
+    clearInterval(iv); const ura = Math.random() < .5;
+    c.classList.remove('flip'); c.classList.toggle('ura', ura); c.textContent = ura ? 'うら' : 'おもて';
+    tossing = false; $('toss').disabled = false; show('r-coin', ura ? 'うら！' : 'おもて！');
+  }, 1300);
+};
+
+/* ---------- じゅんばん ---------- */
+$('shuffle').onclick = () => {
+  const ol = $('order'); ol.innerHTML = '';
+  if (choices.length < 2) { ol.innerHTML = '<li>せんたくしを 2こ いじょう いれてね</li>'; return; }
+  shuffled(choices).forEach((c, i) => setTimeout(() => {
+    const li = document.createElement('li'); li.innerHTML = `<b>${i + 1}ばん</b>`; li.append(c); ol.append(li); beep(523 + i * 60, .08);
+  }, i * 220));
+};
+
+/* ---------- チームわけ ---------- */
+let teamN = 2;
+segSetup('teamN', n => { teamN = n; });
+$('split').onclick = () => {
+  const el = $('teams'); el.innerHTML = '';
+  if (choices.length < teamN) { el.innerHTML = `<p class="note">せんたくしを ${teamN}こ いじょう いれてね</p>`; return; }
+  const ts = Array.from({ length: teamN }, () => []);
+  shuffled(choices).forEach((c, i) => ts[i % teamN].push(c));
+  const names = ['あか', 'あお', 'みどり', 'きいろ'], cols = ['#D82800', '#0078F8', '#00A800', '#F8B800'];
+  ts.forEach((t, i) => {
+    const d = document.createElement('div'); d.className = 'team'; d.style.background = i === 3 ? '#FCE0A8' : '#FCFCFC';
+    const h = document.createElement('h3'); h.textContent = names[i] + 'チーム'; h.style.color = cols[i];
+    const m = document.createElement('div'); m.textContent = t.join('・');
+    d.append(h, m); el.append(d);
+  });
+  fanfare();
+};
+
+/* ---------- はじめ ---------- */
+renderChips(); makeDice(); renderKuji(); select(current);
+newAmida();
+const redraw = () => { drawWheel(); drawAmida(); };
+addEventListener('resize', redraw);
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', redraw));
+(document.fonts ? document.fonts.ready : Promise.resolve()).then(redraw);
+</script>
+</body>
+</html>
